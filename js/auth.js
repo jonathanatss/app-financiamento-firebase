@@ -8,42 +8,70 @@ const auth = firebase.auth();
  * @param {string} senha - A senha do usuário.
  */
 function registrarUsuario(email, senha) {
-    auth.createUserWithEmailAndPassword(email, senha)
-        .then((userCredential) => {
-            // Usuário registrado
-            const user = userCredential.user;
-            console.log("Usuário registrado:", user);
+    if (!email || !senha) {
+        if (typeof displayAuthFeedback === 'function') {
+            displayAuthFeedback("E-mail e senha são obrigatórios.", "error");
+        }
+        return;
+    }
 
-            // Enviar e-mail de verificação
-            user.sendEmailVerification()
-                .then(() => {
-                    console.log("E-mail de verificação enviado para:", user.email);
-                    if (typeof displayAuthFeedback === 'function') {
-                        displayAuthFeedback("Registro bem-sucedido! Um e-mail de verificação foi enviado para " + user.email + ". Por favor, verifique sua caixa de entrada.", "success");
-                    } else {
-                        alert("Registro bem-sucedido! Um e-mail de verificação foi enviado. Por favor, verifique sua caixa de entrada.");
-                    }
-                    // O onAuthStateChanged cuidará do redirecionamento e da UI.
-                    // Não vamos deslogar o usuário aqui, ele pode ser redirecionado para app.html
-                    // e lá informamos sobre a necessidade de verificar o e-mail.
-                })
-                .catch((error) => {
-                    console.error("Erro ao enviar e-mail de verificação:", error);
-                    // Mesmo que o envio do e-mail de verificação falhe, o usuário foi criado.
-                    // Informe o usuário sobre o sucesso do registro, mas talvez com um aviso sobre o e-mail.
-                    if (typeof displayAuthFeedback === 'function') {
-                        displayAuthFeedback("Registro bem-sucedido, mas houve um problema ao enviar o e-mail de verificação. Você pode tentar reenviá-lo mais tarde.", "warning");
-                    }
-                });
-        })
-        .catch((error) => {
-            console.error("Erro no registro:", error.code, error.message);
-            let mensagemErro = "Ocorreu um erro ao registrar. Tente novamente.";
-            // ... (seu tratamento de erro existente) ...
-            if (typeof displayAuthFeedback === 'function') {
-                displayAuthFeedback(mensagemErro, "error");
+    const emailParaVerificar = email.trim().toLowerCase(); // Normalizar o e-mail
+
+    // 1. Verificar se o e-mail está na lista de permissões no Firestore
+    db.collection("allowedEmails").doc(emailParaVerificar).get()
+        .then((doc) => {
+            if (doc.exists) {
+                // 2. E-mail permitido, prosseguir com o registro no Firebase Auth
+                console.log("E-mail encontrado na lista de permissões. Tentando registrar...");
+                auth.createUserWithEmailAndPassword(emailParaVerificar, senha)
+                    .then((userCredential) => {
+                        const user = userCredential.user;
+                        console.log("Usuário registrado:", user);
+
+                        user.sendEmailVerification()
+                            .then(() => {
+                                console.log("E-mail de verificação enviado para:", user.email);
+                                if (typeof displayAuthFeedback === 'function') {
+                                    displayAuthFeedback("Registro bem-sucedido! Um e-mail de verificação foi enviado para " + user.email + ".", "success");
+                                }
+                            })
+                            .catch((error) => {
+                                console.error("Erro ao enviar e-mail de verificação:", error);
+                                if (typeof displayAuthFeedback === 'function') {
+                                    displayAuthFeedback("Registro bem-sucedido, mas houve um problema ao enviar o e-mail de verificação.", "warning");
+                                }
+                            });
+
+                        // Opcional: Remover ou marcar o e-mail como "usado" na lista allowedEmails
+                        // db.collection("allowedEmails").doc(emailParaVerificar).delete().then(() => {
+                        //   console.log("E-mail removido da lista de permissões após registro.");
+                        // }).catch(err => console.error("Erro ao remover e-mail da lista:", err));
+
+                    })
+                    .catch((errorAuth) => {
+                        console.error("Erro no registro (Firebase Auth):", errorAuth.code, errorAuth.message);
+                        let mensagemErro = "Ocorreu um erro ao registrar. Tente novamente.";
+                        if (errorAuth.code === 'auth/email-already-in-use') {
+                            mensagemErro = 'Este e-mail já foi registrado. Tente fazer login.';
+                        } else if (errorAuth.code === 'auth/weak-password') {
+                            mensagemErro = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
+                        }
+                        if (typeof displayAuthFeedback === 'function') {
+                            displayAuthFeedback(mensagemErro, "error");
+                        }
+                    });
             } else {
-                alert(mensagemErro);
+                // 3. E-mail não encontrado na lista de permissões
+                console.log("E-mail não encontrado na lista de permissões:", emailParaVerificar);
+                if (typeof displayAuthFeedback === 'function') {
+                    displayAuthFeedback("Este e-mail não está autorizado para registro. Entre em contato com o administrador.", "error");
+                }
+            }
+        })
+        .catch((errorFirestore) => {
+            console.error("Erro ao verificar e-mail no Firestore:", errorFirestore);
+            if (typeof displayAuthFeedback === 'function') {
+                displayAuthFeedback("Ocorreu um erro ao verificar a permissão de registro. Tente novamente.", "error");
             }
         });
 }

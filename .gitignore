@@ -1,4 +1,6 @@
 # Firebase config
 js/firebase-config.js
 
-# Outros...
+# Outros arquivos sensíveis ou pastas de ambiente
+# .env
+# secrets/
