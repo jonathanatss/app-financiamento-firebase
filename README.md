@@ -3,7 +3,6 @@
 Aplicação web para auxiliar no acompanhamento e gerenciamento de todas as despesas relacionadas ao financiamento de um imóvel, desde a entrada até custos adicionais como taxas e impostos.
 
 **Acesse a aplicação online em:** [https://jonathanatss.github.io/app-financiamento-firebase/](https://jonathanatss.github.io/app-financiamento-firebase/)
-*(Substitua pelo link correto se o nome do seu repositório ou usuário for diferente, ou se você usar um domínio customizado).*
 
 ## ✨ Funcionalidades Principais
 
