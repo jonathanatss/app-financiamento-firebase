@@ -1,219 +1,216 @@
 // js/auth.js
+console.log("auth.js: Script carregado.");
+console.log("auth.js: Verificando objeto 'firebase' global no início:", typeof firebase);
+
+var auth; // Declarar auth no escopo do arquivo
+var db;   // Declarar db no escopo do arquivo
+
+try {
+    if (typeof firebase !== 'undefined') {
+        console.log("auth.js: Objeto 'firebase' global existe.");
+        if (firebase.auth) {
+            console.log("auth.js: firebase.auth está disponível. Tentando obter instância de auth...");
+            auth = firebase.auth(); // Atribuir à variável auth
+            console.log("auth.js: Instância de Firebase auth obtida:", auth);
+        } else {
+            console.error("auth.js: ERRO - firebase.auth NÃO está disponível! O Firebase App foi inicializado corretamente em firebase-config.js e o SDK firebase-auth.js está carregado?");
+        }
+
+        if (firebase.firestore) {
+            console.log("auth.js: firebase.firestore está disponível. Tentando obter instância de db...");
+            db = firebase.firestore(); // Atribuir à variável db
+            console.log("auth.js: Instância de Firestore (db) obtida:", db);
+        } else {
+            console.error("auth.js: ERRO - firebase.firestore NÃO está disponível! O SDK firebase-firestore.js está carregado e o Firebase App inicializado?");
+        }
+    } else {
+        console.error("auth.js: ERRO CRÍTICO - Objeto 'firebase' global NÃO existe! SDKs do Firebase não foram carregados corretamente antes deste script.");
+    }
+} catch (e) {
+    console.error("auth.js: ERRO CRÍTICO ao tentar obter instâncias de Firebase (auth/db):", e);
+}
 
 // --- Funções de Autenticação ---
-const auth = firebase.auth();
-/**
- * Registra um novo usuário com e-mail e senha.
- * @param {string} email - O e-mail do usuário.
- * @param {string} senha - A senha do usuário.
- */
+
 function registrarUsuario(email, senha) {
-    if (!email || !senha) {
+    console.log("auth.js: registrarUsuario foi chamado com email:", email);
+    console.log("auth.js: Verificando 'auth':", typeof auth, "e 'db':", typeof db);
+
+    if (!auth || (typeof auth.createUserWithEmailAndPassword !== 'function')) {
+        console.error("auth.js: registrarUsuario - Instância de 'auth' ou método createUserWithEmailAndPassword não está disponível!");
         if (typeof displayAuthFeedback === 'function') {
-            displayAuthFeedback("E-mail e senha são obrigatórios.", "error");
+            displayAuthFeedback("Erro de configuração de autenticação. Tente mais tarde.", "error");
         }
         return;
     }
+    if (!db || (typeof db.collection !== 'function')) { // Necessário para a whitelist
+        console.error("auth.js: registrarUsuario - Instância de 'db' (Firestore) ou método collection não está disponível!");
+        if (typeof displayAuthFeedback === 'function') {
+            displayAuthFeedback("Erro de configuração do banco de dados para registro. Tente mais tarde.", "error");
+        }
+        return;
+    }
+    if (!email || !senha) {
+        if (typeof displayAuthFeedback === 'function') displayAuthFeedback("E-mail e senha são obrigatórios.", "error");
+        return;
+    }
+    const emailParaVerificar = email.trim().toLowerCase();
+    console.log("auth.js: registrarUsuario - Verificando permissão para e-mail no Firestore:", emailParaVerificar);
 
-    const emailParaVerificar = email.trim().toLowerCase(); // Normalizar o e-mail
-
-    // 1. Verificar se o e-mail está na lista de permissões no Firestore
     db.collection("allowedEmails").doc(emailParaVerificar).get()
         .then((doc) => {
             if (doc.exists) {
-                // 2. E-mail permitido, prosseguir com o registro no Firebase Auth
-                console.log("E-mail encontrado na lista de permissões. Tentando registrar...");
+                console.log("auth.js: registrarUsuario - E-mail PERMITIDO:", emailParaVerificar, ". Registrando no Auth...");
                 auth.createUserWithEmailAndPassword(emailParaVerificar, senha)
                     .then((userCredential) => {
                         const user = userCredential.user;
-                        console.log("Usuário registrado:", user);
-
+                        console.log("auth.js: registrarUsuario - Usuário registrado no Auth:", user.email);
                         user.sendEmailVerification()
                             .then(() => {
-                                console.log("E-mail de verificação enviado para:", user.email);
-                                if (typeof displayAuthFeedback === 'function') {
-                                    displayAuthFeedback("Registro bem-sucedido! Um e-mail de verificação foi enviado para " + user.email + ".", "success");
-                                }
+                                console.log("auth.js: registrarUsuario - E-mail de verificação enviado para:", user.email);
+                                if (typeof displayAuthFeedback === 'function') displayAuthFeedback("Registro bem-sucedido! Um e-mail de verificação foi enviado.", "success");
                             })
-                            .catch((error) => {
-                                console.error("Erro ao enviar e-mail de verificação:", error);
-                                if (typeof displayAuthFeedback === 'function') {
-                                    displayAuthFeedback("Registro bem-sucedido, mas houve um problema ao enviar o e-mail de verificação.", "warning");
-                                }
+                            .catch((errorVerification) => {
+                                console.error("auth.js: registrarUsuario - Erro ao enviar e-mail de verificação:", errorVerification);
+                                if (typeof displayAuthFeedback === 'function') displayAuthFeedback("Registro OK, mas falha ao enviar e-mail de verificação.", "warning");
                             });
-
-                        // Opcional: Remover ou marcar o e-mail como "usado" na lista allowedEmails
-                        // db.collection("allowedEmails").doc(emailParaVerificar).delete().then(() => {
-                        //   console.log("E-mail removido da lista de permissões após registro.");
-                        // }).catch(err => console.error("Erro ao remover e-mail da lista:", err));
-
                     })
                     .catch((errorAuth) => {
-                        console.error("Erro no registro (Firebase Auth):", errorAuth.code, errorAuth.message);
+                        console.error("auth.js: registrarUsuario - Erro no registro (Firebase Auth):", errorAuth);
                         let mensagemErro = "Ocorreu um erro ao registrar. Tente novamente.";
-                        if (errorAuth.code === 'auth/email-already-in-use') {
-                            mensagemErro = 'Este e-mail já foi registrado. Tente fazer login.';
-                        } else if (errorAuth.code === 'auth/weak-password') {
-                            mensagemErro = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
-                        }
-                        if (typeof displayAuthFeedback === 'function') {
-                            displayAuthFeedback(mensagemErro, "error");
-                        }
+                        if (errorAuth.code === 'auth/email-already-in-use') mensagemErro = 'Este e-mail já foi registrado. Tente fazer login.';
+                        else if (errorAuth.code === 'auth/weak-password') mensagemErro = 'A senha é muito fraca (mínimo 6 caracteres).';
+                        if (typeof displayAuthFeedback === 'function') displayAuthFeedback(mensagemErro, "error");
                     });
             } else {
-                // 3. E-mail não encontrado na lista de permissões
-                console.log("E-mail não encontrado na lista de permissões:", emailParaVerificar);
-                if (typeof displayAuthFeedback === 'function') {
-                    displayAuthFeedback("Este e-mail não está autorizado para registro. Entre em contato com o administrador.", "error");
-                }
+                console.log("auth.js: registrarUsuario - E-mail NÃO PERMITIDO:", emailParaVerificar);
+                if (typeof displayAuthFeedback === 'function') displayAuthFeedback("Este e-mail não está autorizado para registro.", "error");
             }
         })
         .catch((errorFirestore) => {
-            console.error("Erro ao verificar e-mail no Firestore:", errorFirestore);
-            if (typeof displayAuthFeedback === 'function') {
-                displayAuthFeedback("Ocorreu um erro ao verificar a permissão de registro. Tente novamente.", "error");
-            }
+            console.error("auth.js: registrarUsuario - Erro ao verificar e-mail no Firestore:", errorFirestore);
+            if (typeof displayAuthFeedback === 'function') displayAuthFeedback("Erro ao verificar permissão de registro. Tente mais tarde.", "error");
         });
 }
 
-/**
- * Loga um usuário existente com e-mail e senha.
- * @param {string} email - O e-mail do usuário.
- * @param {string} senha - A senha do usuário.
- */
 function logarUsuario(email, senha) {
-    auth.signInWithEmailAndPassword(email, senha)
-        .then((userCredential) => {
-            // Usuário logado
-            console.log("Usuário logado:", userCredential.user);
-            // O onAuthStateChanged cuidará do redirecionamento e da UI.
-            // Se precisar de feedback imediato na página de login:
-            if (typeof displayAuthFeedback === 'function') {
-                // displayAuthFeedback("Login bem-sucedido! Redirecionando...", "success"); // Feedback opcional
-            }
-            // Não é estritamente necessário redirecionar aqui, pois o onAuthStateChanged fará isso.
-            // window.location.href = 'app.html';
-        })
-        .catch((error) => {
-            console.error("Erro no login:", error.code, error.message);
-            let mensagemErro = "E-mail ou senha incorretos. Tente novamente.";
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                mensagemErro = 'E-mail ou senha inválidos.';
-            } else if (error.code === 'auth/invalid-email') {
-                mensagemErro = 'O formato do e-mail é inválido.';
-            }
-            if (typeof displayAuthFeedback === 'function') {
-                displayAuthFeedback(mensagemErro, "error");
-            } else {
-                alert(mensagemErro);
-            }
-        });
-}
-
-/**
- * Desloga o usuário atual.
- */
-function deslogarUsuario() {
-    auth.signOut().then(() => {
-        console.log("Usuário deslogado.");
-        // O onAuthStateChanged cuidará do redirecionamento.
-        // window.location.href = 'index.html';
-    }).catch((error) => {
-        console.error("Erro ao deslogar:", error.message);
-        alert("Erro ao tentar sair. Tente novamente.");
-    });
-}
-
-/**
- * Envia um e-mail de redefinição de senha para o e-mail fornecido.
- * @param {string} email - O e-mail do usuário.
- */
-function enviarEmailRecuperacaoSenha(email) {
-    if (!email) {
+    console.log("auth.js: logarUsuario foi chamado com email:", email);
+    console.log("auth.js: Verificando instância de 'auth':", typeof auth);
+    if (!auth || (typeof auth.signInWithEmailAndPassword !== 'function')) {
+        console.error("auth.js: logarUsuario - Instância de 'auth' ou método signInWithEmailAndPassword não está disponível!");
         if (typeof displayAuthFeedback === 'function') {
-            displayAuthFeedback("Por favor, insira seu endereço de e-mail.", "warning");
-        } else {
-            alert("Por favor, insira seu endereço de e-mail.");
+            displayAuthFeedback("Erro de configuração de autenticação. Tente mais tarde.", "error");
         }
         return;
     }
-
-    auth.sendPasswordResetEmail(email)
-        .then(() => {
-            console.log("E-mail de recuperação de senha enviado para:", email);
+    if (!email || !senha) {
+        if (typeof displayAuthFeedback === 'function') displayAuthFeedback("E-mail e senha são obrigatórios.", "error");
+        return;
+    }
+    auth.signInWithEmailAndPassword(email, senha)
+        .then((userCredential) => {
+            console.log("auth.js: logarUsuario - Usuário logado com sucesso:", userCredential.user.email);
             if (typeof displayAuthFeedback === 'function') {
-                displayAuthFeedback("E-mail de recuperação de senha enviado para " + email + ". Verifique sua caixa de entrada (e spam).", "success");
-            } else {
-                alert("E-mail de recuperação de senha enviado. Verifique sua caixa de entrada (e spam).");
+                // displayAuthFeedback("Login bem-sucedido! Redirecionando...", "success"); // Opcional, onAuthStateChanged cuida do redirect
             }
         })
         .catch((error) => {
-            console.error("Erro ao enviar e-mail de recuperação:", error);
-            let mensagemErro = "Erro ao enviar e-mail de recuperação. Tente novamente.";
-            if (error.code === 'auth/user-not-found') {
-                mensagemErro = "Nenhum usuário encontrado com este e-mail.";
-            } else if (error.code === 'auth/invalid-email') {
-                mensagemErro = "O formato do e-mail é inválido.";
-            }
+            console.error("auth.js: logarUsuario - Erro no login:", error);
+            let mensagemErro = "E-mail ou senha incorretos. Tente novamente.";
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') mensagemErro = 'E-mail ou senha inválidos.';
+            else if (error.code === 'auth/invalid-email') mensagemErro = 'O formato do e-mail é inválido.';
+            if (typeof displayAuthFeedback === 'function') displayAuthFeedback(mensagemErro, "error");
+        });
+}
 
-            if (typeof displayAuthFeedback === 'function') {
-                displayAuthFeedback(mensagemErro, "error");
-            } else {
-                alert(mensagemErro);
-            }
+function deslogarUsuario() {
+    console.log("auth.js: deslogarUsuario foi chamado. Verificando 'auth':", typeof auth);
+    if (!auth || (typeof auth.signOut !== 'function')) {
+        console.error("auth.js: deslogarUsuario - Instância de 'auth' ou método signOut não está disponível!");
+        return;
+    }
+    auth.signOut().then(() => {
+        console.log("auth.js: deslogarUsuario - Usuário deslogado com sucesso.");
+    }).catch((error) => {
+        console.error("auth.js: deslogarUsuario - Erro ao deslogar:", error);
+        alert("Erro ao tentar sair.");
+    });
+}
+
+function enviarEmailRecuperacaoSenha(email) {
+    console.log("auth.js: enviarEmailRecuperacaoSenha foi chamado para:", email);
+    console.log("auth.js: Verificando 'auth':", typeof auth);
+     if (!auth || (typeof auth.sendPasswordResetEmail !== 'function')) {
+        console.error("auth.js: enviarEmailRecuperacaoSenha - Instância de 'auth' ou método sendPasswordResetEmail não está disponível!");
+         if (typeof displayAuthFeedback === 'function') displayAuthFeedback("Erro de configuração. Não é possível recuperar senha.", "error");
+        return;
+    }
+    if (!email) {
+        if (typeof displayAuthFeedback === 'function') displayAuthFeedback("Por favor, insira seu endereço de e-mail.", "warning");
+        return;
+    }
+    auth.sendPasswordResetEmail(email)
+        .then(() => {
+            console.log("auth.js: enviarEmailRecuperacaoSenha - E-mail de recuperação enviado para:", email);
+            if (typeof displayAuthFeedback === 'function') displayAuthFeedback("E-mail de recuperação enviado para " + email + ". Verifique sua caixa de entrada.", "success");
+        })
+        .catch((error) => {
+            console.error("auth.js: enviarEmailRecuperacaoSenha - Erro ao enviar e-mail:", error);
+            let mensagemErro = "Erro ao enviar e-mail de recuperação.";
+            if (error.code === 'auth/user-not-found') mensagemErro = "Nenhum usuário encontrado com este e-mail.";
+            else if (error.code === 'auth/invalid-email') mensagemErro = 'O formato do e-mail é inválido.';
+            if (typeof displayAuthFeedback === 'function') displayAuthFeedback(mensagemErro, "error");
         });
 }
 
 
 // --- Observador de Estado de Autenticação ---
-// Este é o listener principal que reage às mudanças de estado de login.
-auth.onAuthStateChanged((user) => {
-    const currentPage = window.location.pathname.split("/").pop(); // Obtém o nome do arquivo atual (ex: index.html)
+console.log("auth.js: Configurando onAuthStateChanged. Verificando 'auth':", typeof auth);
+if (auth && typeof auth.onAuthStateChanged === 'function') {
+    auth.onAuthStateChanged((user) => {
+        const currentPage = window.location.pathname.split("/").pop();
+        const userInfoEl = document.getElementById('userInfo'); // Para app.html
+        const btnLogout = document.getElementById('btnLogout'); // Para app.html
+        const emailVerificationStatusEl = document.getElementById('emailVerificationStatus'); // Para app.html
+        const btnResendVerification = document.getElementById('btnResendVerification'); // Para app.html
 
-    if (user) {
-        // Usuário está logado
-        console.log("Auth state: Usuário conectado:", user.uid, user.email);
-
-        // Se estiver na página de login (index.html), redireciona para a aplicação principal (app.html)
-        if (currentPage === 'index.html' || currentPage === '') {
-            window.location.href = 'app.html';
-        } else if (currentPage === 'app.html') {
-            // Atualiza UI em app.html se já estiver nela
-            const userInfoEl = document.getElementById('userInfo');
-            if (userInfoEl) {
-                userInfoEl.textContent = `Logado como: ${user.email}`;
+        if (user) {
+            console.log("auth.js: onAuthStateChanged - Usuário CONECTADO:", user.uid, user.email, "Verificado:", user.emailVerified);
+            if (currentPage === 'index.html' || currentPage === '') {
+                window.location.href = 'app.html';
+            } else if (currentPage === 'app.html') {
+                if (userInfoEl) userInfoEl.textContent = `Logado como: ${user.email}`;
+                if (btnLogout) btnLogout.style.display = 'block';
+                if (emailVerificationStatusEl && btnResendVerification) {
+                    if (user.emailVerified) {
+                        emailVerificationStatusEl.textContent = '(E-mail verificado)';
+                        emailVerificationStatusEl.style.color = 'green';
+                        btnResendVerification.style.display = 'none';
+                    } else {
+                        emailVerificationStatusEl.textContent = '(E-mail não verificado)';
+                        emailVerificationStatusEl.style.color = 'orange';
+                        btnResendVerification.style.display = 'inline-block';
+                        btnResendVerification.onclick = () => {
+                            user.sendEmailVerification()
+                                .then(() => { alert("Novo e-mail de verificação enviado para " + user.email); })
+                                .catch((e) => { console.error("Erro ao reenviar verificação:", e); alert("Erro ao reenviar e-mail de verificação."); });
+                        };
+                    }
+                }
             }
-            const btnLogout = document.getElementById('btnLogout');
-            if (btnLogout) {
-                btnLogout.style.display = 'block'; // Ou 'inline-block', etc.
+        } else {
+            console.log("auth.js: onAuthStateChanged - Usuário DESCONECTADO.");
+            if (currentPage === 'app.html') {
+                window.location.href = 'index.html';
             }
-            // Aqui você pode também chamar a função para carregar os dados do usuário do localStorage
-            // ou, futuramente, do Firestore.
-            // Ex: if (typeof carregarDados === 'function') carregarDados();
+            // Limpeza da UI em app.html (caso a página não redirecione imediatamente)
+            if (userInfoEl) userInfoEl.textContent = 'Bem-vindo!';
+            if (btnLogout) btnLogout.style.display = 'none';
+            if (emailVerificationStatusEl) emailVerificationStatusEl.textContent = '';
+            if (btnResendVerification) btnResendVerification.style.display = 'none';
         }
-
-    } else {
-        // Usuário não está logado
-        console.log("Auth state: Nenhum usuário conectado.");
-
-        // Se estiver tentando acessar app.html sem login, redireciona para index.html
-        if (currentPage === 'app.html') {
-            window.location.href = 'index.html';
-        } else if (currentPage === 'index.html' || currentPage === '') {
-            // Garante que a UI de login/registro está correta em index.html
-            // (os formulários já devem estar visíveis por padrão)
-        }
-        // Em app.html, se houver, limpa informações do usuário e esconde botão de logout
-        // (embora o redirecionamento acima deva prevenir isso)
-        if (currentPage === 'app.html') { // Adicional, caso o redirecionamento demore ou falhe
-            const userInfoEl = document.getElementById('userInfo');
-            if (userInfoEl) {
-                userInfoEl.textContent = 'Bem-vindo!';
-            }
-            const btnLogout = document.getElementById('btnLogout');
-            if (btnLogout) {
-                btnLogout.style.display = 'none';
-            }
-        }
-    }
-});
+    });
+    console.log("auth.js: Listener onAuthStateChanged configurado.");
+} else {
+    console.error("auth.js: ERRO - Não foi possível configurar onAuthStateChanged porque 'auth' não é uma instância válida ou auth.onAuthStateChanged não é uma função.");
+}
