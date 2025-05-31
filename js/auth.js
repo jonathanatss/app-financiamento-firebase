@@ -57,7 +57,7 @@ function registrarUsuario(email, senha) {
     const emailParaVerificar = email.trim().toLowerCase();
     console.log("auth.js: registrarUsuario - Verificando permissão para e-mail no Firestore:", emailParaVerificar);
 
-    db.collection("allowedEmails").doc(emailParaVerificar).get()
+    db.collection("emailsPermitidos").doc(emailParaVerificar).get()
         .then((doc) => {
             if (doc.exists) {
                 console.log("auth.js: registrarUsuario - E-mail PERMITIDO:", emailParaVerificar, ". Registrando no Auth...");
