@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Financiamento - Sua Casa</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-header">
+        <div id="userInfoContainer">
+            <span id="userInfo">Bem-vindo!</span>
+            <span id="emailVerificationStatus" style="font-size: 0.8em; margin-left: 10px;"></span>
+            <button id="btnResendVerification" class="btn btn-warning" style="display:none; font-size:0.7em; padding: 4px 8px; margin-left:10px;">Reenviar Verificação</button>
+        </div>
+        <button class="btn btn-danger" id="btnLogout">Sair</button>
+    </div>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-home"></i> Controle de Financiamento</h1>
+            <p>Acompanhe todos os gastos do seu imóvel de forma simples</p>
+        </header>
+
+        <nav class="nav-buttons">
+            <button class="nav-btn" onclick="showSection('dashboard')"><i class="fas fa-chart-pie"></i> Resumo</button>
+            <button class="nav-btn" onclick="showSection('metas')"><i class="fas fa-bullseye"></i> Metas</button>
+            <button class="nav-btn" onclick="showSection('pagantes')"><i class="fas fa-users"></i> Pagantes</button>
+            <button class="nav-btn" onclick="showSection('pagamentos')"><i class="fas fa-money-bill-wave"></i> Pagamentos</button>
+            <button class="nav-btn" onclick="showSection('incc')"><i class="fas fa-calculator"></i> Reajuste INCC</button>
+            <button class="nav-btn" onclick="showSection('relatorios')"><i class="fas fa-chart-bar"></i> Relatórios</button>
+            <button class="nav-btn" onclick="showSection('dados')">
+                <i class="fas fa-database"></i> Dados
+            </button>
+        </nav>
+
+        <section id="dashboard" class="section">
+            <h2>Resumo Geral</h2>
+            <div class="dashboard-cards">
+                <div class="card green"><h3><i class="fas fa-check-circle"></i> Total Pago Efetivamente</h3><div class="value" id="totalPago">R$ 0,00</div><p>Soma de todas as contribuições pagas</p></div>
+                <div class="card orange"><h3><i class="fas fa-clock"></i> Total Pendente (Lançamentos)</h3><div class="value" id="totalPendente">R$ 0,00</div><p>Soma dos lançamentos com status pendente/parcial</p></div>
+                <div class="card blue"><h3><i class="fas fa-file-invoice-dollar"></i> Total Lançado</h3><div class="value" id="totalGeral">R$ 0,00</div><p>Soma de todos os valores de pagamentos lançados</p></div>
+                <div class="card purple" id="cardMetaPrincipalDashboard" style="display:none;"><h3 id="nomeMetaPrincipalDashboard"><i class="fas fa-piggy-bank"></i> Saldo Devedor Meta</h3><div class="value" id="saldoDevedorMetaPrincipal">R$ 0,00</div><div id="detalheMetaPrincipalDashboard" style="font-size: 0.9em; margin-bottom: 10px;"><p>Total: <span id="valorTotalMetaPrincipal">R$ 0,00</span></p><p>Pago: <span id="valorPagoMetaPrincipal">R$ 0,00</span></p></div><div class="progress-bar"><div class="progress-fill" id="progressFillMetaPrincipal" style="width: 0%; background: linear-gradient(90deg, #ab47bc, #8e24aa);"></div></div><p style="text-align: center; margin-top: 5px; font-size: 0.9em;"><span id="progressTextMetaPrincipal">0%</span> concluído</p></div>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width: 0%"></div></div>
+            <p style="text-align: center; margin-top: 10px;"><strong>Progresso Geral dos Lançamentos: <span id="progressText">0%</span> concluído</strong></p>
+            <div id="proximosVencimentos" class="pagamentos-list" style="margin-top:30px;"><h3>Próximos Vencimentos</h3></div>
+        </section>
+        <section id="metas" class="section"><h2><i class="fas fa-bullseye"></i> Gerenciar Metas de Pagamento</h2><p style="text-align: center; margin-bottom: 25px; color: #666;">Cadastre os grandes objetivos financeiros (ex: Entrada, ITBI) para acompanhar o progresso.</p><button class="btn" onclick="openModalMeta()"><i class="fas fa-plus"></i> Adicionar Nova Meta</button><div id="metasList" class="pagamentos-list" style="margin-top: 20px;"></div></section>
+        <section id="pagantes" class="section"><h2>Gerenciar Pagantes</h2><button class="btn" onclick="openModal('modalPagante')"><i class="fas fa-plus"></i> Adicionar Pagante</button><div id="pagantesList" class="pagantes-list"></div></section>
+        <section id="pagamentos" class="section"><h2>Controle de Pagamentos</h2><button class="btn" onclick="abrirModalEdicaoPagamento(null)"><i class="fas fa-plus"></i> Adicionar Pagamento</button><div id="pagamentosList" class="pagamentos-list"></div></section>
+        
+        <section id="incc" class="section">
+            <h2>Analisador de Reajuste INCC na Parcela</h2>
+            <p style="text-align: center; margin-bottom: 25px; color: #666;">
+                Informe o valor original da sua parcela e o valor que você efetivamente pagou (com reajuste INCC) para descobrir o impacto do reajuste.
+            </p>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="valorParcelaOriginal">Valor Original da Parcela (R$):</label>
+                    <input type="number" id="valorParcelaOriginal" placeholder="Ex: 1000.00" step="0.01" min="0.01" oninput="updateFormattedInputDisplay('valorParcelaOriginal', 'formattedValorParcelaOriginalDisplay')">
+                    <span id="formattedValorParcelaOriginalDisplay" class="formatted-input-display"></span>
+                </div>
+                <div class="form-group">
+                    <label for="valorParcelaPagaComINCC">Valor Pago da Parcela com INCC (R$):</label>
+                    <input type="number" id="valorParcelaPagaComINCC" placeholder="Ex: 1070.00" step="0.01" min="0.01" oninput="updateFormattedInputDisplay('valorParcelaPagaComINCC', 'formattedValorParcelaPagaComINCCDisplay')">
+                    <span id="formattedValorParcelaPagaComINCCDisplay" class="formatted-input-display"></span>
+                </div>
+            </div>
+            <button class="btn" onclick="analisarReajusteINCC()"><i class="fas fa-percentage"></i> Analisar Reajuste</button>
+            <div class="grid-2" style="margin-top: 25px; padding-top:15px; border-top: 1px solid #eee;">
+                <div class="form-group">
+                    <label for="valorDoReajusteINCC">Valor do Reajuste (R$):</label>
+                    <input type="text" id="valorDoReajusteINCC" readonly style="background: #f0f0f0; font-weight: bold; color: #c53030;">
+                </div>
+                <div class="form-group">
+                    <label for="percentualDoReajusteINCC">Percentual de Reajuste (%):</label>
+                    <input type="text" id="percentualDoReajusteINCC" readonly style="background: #f0f0f0; font-weight: bold; color: #c53030;">
+                </div>
+            </div>
+            <div id="historicoAnalisesINCC" style="margin-top: 30px;">
+                <h3>Histórico de Análises de Reajuste</h3>
+            </div>
+        </section>
+
+        <section id="dados" class="section">
+            <h2><i class="fas fa-database"></i> Gerenciar Dados da Aplicação</h2>
+            
+            <div class="card" style="background: white; color: #333; text-align: left; margin-bottom: 30px;">
+                <h3 style="color: #667eea; margin-bottom: 15px;"><i class="fas fa-file-export"></i> Exportar Dados</h3>
+                <p style="margin-bottom: 15px;">
+                    Salve todos os seus dados de financiamento (pagantes, pagamentos, metas, etc.) em um arquivo no formato JSON. 
+                    É altamente recomendável fazer backups regulares dos seus dados.
+                </p>
+                <button class="btn btn-success" onclick="exportarDadosParaJson()">
+                    <i class="fas fa-download"></i> Exportar Dados para JSON
+                </button>
+            </div>
+
+            <div class="card" style="background: white; color: #333; text-align: left;">
+                <h3 style="color: #667eea; margin-bottom: 15px;"><i class="fas fa-file-import"></i> Importar Dados</h3>
+                <p style="margin-bottom: 10px;">
+                    Carregue um arquivo JSON (previamente exportado desta aplicação) para restaurar ou transferir seus dados.
+                </p>
+                <p style="color: #c53030; font-weight: bold; margin-bottom: 15px; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; background-color: #f8d7da;">
+                    <i class="fas fa-exclamation-triangle"></i> ATENÇÃO: A importação de dados irá SOBRESCREVER todos os dados atualmente salvos no seu navegador. 
+                    Recomenda-se exportar (fazer backup) dos seus dados atuais antes de prosseguir com uma importação, caso deseje mantê-los.
+                </p>
+                <div class="form-group">
+                    <label for="importarArquivoJson" style="font-weight:600;">Selecione o arquivo JSON para importar:</label>
+                    <input type="file" id="importarArquivoJson" accept=".json" style="padding: 10px; border: 1px solid #ccc; border-radius: 5px; display: block; width: 100%;">
+                </div>
+                <button class="btn" style="background-color: #007bff;" onclick="importarDadosDeJson()"> <i class="fas fa-upload"></i> Importar Arquivo JSON
+                </button>
+            </div>
+        </section>
+
+        <section id="relatorios" class="section"><h2>Relatórios</h2><div class="grid-2"><button class="btn" onclick="gerarRelatorioGeral()"><i class="fas fa-file-alt"></i> Relatório Geral</button><button class="btn" onclick="gerarRelatorioPagantes()"><i class="fas fa-users"></i> Por Pagante</button></div><div id="relatorioContent" style="margin-top: 30px;"></div></section>
+    </div>
+
+    <div id="modalPagante" class="modal"><div class="modal-content"><span class="close" onclick="closeModal('modalPagante')" role="button" tabindex="0" aria-label="Fechar">&times;</span><h3 id="modalPaganteTitle">Adicionar Pagante</h3><form id="formPagante" onsubmit="salvarPagante(event)"><input type="hidden" id="idPaganteEditando" value=""><div class="form-group"><label for="nomePagante">Nome Completo:</label><input type="text" id="nomePagante" required></div><div class="form-group"><label for="apelidoPagante" class="tooltip" data-tooltip="Como você quer chamá-lo no sistema">Apelido:</label><input type="text" id="apelidoPagante"></div><button type="submit" class="btn btn-success" id="btnSalvarPagante"><i class="fas fa-save"></i> Salvar</button><button type="button" class="btn" onclick="closeModal('modalPagante')">Cancelar</button></form></div></div>
+    <div id="modalPagamento" class="modal"><div class="modal-content"><span class="close" onclick="closeModal('modalPagamento')" role="button" tabindex="0" aria-label="Fechar">&times;</span><h3 id="modalPagamentoTitle">Adicionar Pagamento</h3><form id="formPagamento" onsubmit="salvarPagamento(event)"><input type="hidden" id="idPagamentoEditando" value=""><div class="form-group"><label for="tipoPagamento">Tipo de Pagamento:</label><select id="tipoPagamento" required onchange="updateTipoPagamento()"><option value="">Selecione...</option><option value="sinal">Sinal de Entrada</option><option value="entrada">Parcela de Entrada</option><option value="incc">Reajuste INCC</option><option value="juros">Juros de Obras</option><option value="registro">Taxa de Registro</option><option value="itbi">ITBI</option><option value="outros">Outros Custos</option></select></div><div class="form-group"><label for="descricaoPagamento">Descrição:</label><input type="text" id="descricaoPagamento" required></div><div class="grid-2"><div class="form-group"><label for="valorPagamento">Valor Total:</label><input type="number" id="valorPagamento" step="0.01" required min="0.01" oninput="gerenciarCamposContribuicao(); updateFormattedInputDisplay('valorPagamento', 'formattedValorPagamentoDisplay');"><span id="formattedValorPagamentoDisplay" class="formatted-input-display"></span></div><div class="form-group"><label for="dataPagamento">Data de Vencimento:</label><input type="date" id="dataPagamento" required></div></div><div class="form-group"><label for="vincularMetaPagamento">Vincular a uma Meta? (Opcional)</label><select id="vincularMetaPagamento"><option value="">Nenhuma meta específica</option></select></div><div class="form-group" id="blocoContribuicoesPagantes" style="display:none; margin-top: 20px; padding-top:15px; border-top: 1px solid #eee;"><h5>Distribuição entre Pagantes:</h5><div id="camposContribuicaoPagantes" style="margin-bottom:10px;"></div><div id="distribuicaoPagantesFeedback" style="font-weight: normal;"><p>Valor Total do Pagamento: R$ <strong id="valorTotalPagamentoDisplay">0.00</strong></p><p>Soma das Contribuições: R$ <strong id="somaContribuicoesDisplay">0.00</strong></p><p>Diferença: R$ <strong id="diferencaContribuicoesDisplay" style="color: red;">0.00</strong></p></div></div><button type="submit" class="btn btn-success" id="btnSubmitPagamento"><i class="fas fa-save"></i> Salvar</button><button type="button" class="btn" onclick="closeModal('modalPagamento')">Cancelar</button></form></div></div>
+    <div id="modalMeta" class="modal"><div class="modal-content"><span class="close" onclick="closeModal('modalMeta')" role="button" tabindex="0" aria-label="Fechar">&times;</span><h3 id="modalMetaTitle">Adicionar Nova Meta de Pagamento</h3><form id="formMeta" onsubmit="salvarMeta(event)"><input type="hidden" id="idMeta" value=""><div class="form-group"><label for="nomeMeta">Nome da Meta:</label><input type="text" id="nomeMeta" required></div><div class="form-group"><label for="valorTotalMeta">Valor Total da Meta (R$):</label><input type="number" id="valorTotalMeta" step="0.01" min="0.01" required oninput="updateFormattedInputDisplay('valorTotalMeta', 'formattedValorTotalMetaDisplay')"><span id="formattedValorTotalMetaDisplay" class="formatted-input-display"></span></div><div class="form-group"><input type="checkbox" id="metaPrincipalDashboard" onchange="handleMetaPrincipalCheckbox(this)"><label for="metaPrincipalDashboard" style="display: inline; font-weight: normal;">Marcar como meta principal no Dashboard?</label></div><button type="submit" class="btn btn-success" id="btnSalvarMeta"><i class="fas fa-save"></i> Salvar Meta</button><button type="button" class="btn" onclick="closeModal('modalMeta')">Cancelar</button></form></div></div>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script> <script src="js/app.js"></script>
+
+    <script>
+        // Listener para o botão de logout
+        const btnLogout = document.getElementById('btnLogout');
+        if (btnLogout) {
+            btnLogout.addEventListener('click', () => {
+                // A função deslogarUsuario virá do seu arquivo auth.js
+                if (typeof deslogarUsuario === 'function') {
+                    deslogarUsuario();
+                } else {
+                    console.error('Função deslogarUsuario não definida. Verifique auth.js');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Controle de Financiamento</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css"> 
+    <link rel="stylesheet" href="css/auth.css"> 
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <h1><i class="fas fa-home"></i> Controle de Financiamento</h1>
+            
+            <div id="login-form">
+                <h2>Login</h2>
+                <div class="form-group">
+                    <label for="loginEmail">Email:</label>
+                    <input type="email" id="loginEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginSenha">Senha:</label>
+                    <input type="password" id="loginSenha" required>
+                </div>
+                <button class="btn btn-primary" id="btnLogin">Entrar</button>
+                <p class="toggle-form">Não tem uma conta? <a href="#" id="showRegister">Registre-se</a></p>
+                <p class="toggle-form" style="margin-top: 10px;"><a href="#" id="showPasswordReset">Esqueci minha senha</a></p>
+            </div>
+
+            <div id="register-form" style="display:none;">
+                <h2>Registrar</h2>
+                <div class="form-group">
+                    <label for="registerEmail">Email:</label>
+                    <input type="email" id="registerEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerSenha">Senha:</label>
+                    <input type="password" id="registerSenha" required>
+                </div>
+                <button class="btn btn-success" id="btnRegister">Registrar</button>
+                <p class="toggle-form">Já tem uma conta? <a href="#" id="showLogin">Login</a></p>
+            </div>
+
+            <div id="password-reset-form" style="display:none;">
+                <h2>Recuperar Senha</h2>
+                <p style="font-size:0.9em; margin-bottom:15px; color:#555;">Digite seu e-mail para enviarmos um link de recuperação de senha.</p>
+                <div class="form-group">
+                    <label for="resetEmail">Email:</label>
+                    <input type="email" id="resetEmail" required>
+                </div>
+                <button class="btn btn-warning" id="btnSendPasswordReset">Enviar E-mail de Recuperação</button>
+                <p class="toggle-form">Lembrou a senha? <a href="#" id="backToLoginFromReset">Voltar para Login</a></p>
+            </div>
+
+            <div id="auth-feedback" class="alert" style="display:none; margin-top: 15px;"></div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script> 
+    
+    <script>
+        // Seleciona todos os elementos do DOM uma vez
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const passwordResetForm = document.getElementById('password-reset-form'); // Agora este elemento existe
+        
+        const showRegisterLink = document.getElementById('showRegister');
+        const showLoginLink = document.getElementById('showLogin');
+        const showPasswordResetLink = document.getElementById('showPasswordReset'); // Agora este elemento existe
+        const backToLoginFromResetLink = document.getElementById('backToLoginFromReset'); // Agora este elemento existe
+        
+        const authFeedback = document.getElementById('auth-feedback');
+
+        // Função para esconder todos os formulários e o feedback
+        function hideAllFormsAndFeedback() {
+            if (loginForm) loginForm.style.display = 'none';
+            if (registerForm) registerForm.style.display = 'none';
+            if (passwordResetForm) passwordResetForm.style.display = 'none';
+            if (authFeedback) authFeedback.style.display = 'none';
+        }
+
+        // Event listeners para alternar formulários
+        if (showRegisterLink) {
+            showRegisterLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                hideAllFormsAndFeedback();
+                if (registerForm) registerForm.style.display = 'block';
+            });
+        }
+
+        if (showLoginLink) {
+            showLoginLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                hideAllFormsAndFeedback();
+                if (loginForm) loginForm.style.display = 'block';
+            });
+        }
+
+        if (showPasswordResetLink) {
+            showPasswordResetLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                hideAllFormsAndFeedback();
+                if (passwordResetForm) passwordResetForm.style.display = 'block';
+            });
+        }
+        
+        if (backToLoginFromResetLink) {
+            backToLoginFromResetLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                hideAllFormsAndFeedback();
+                if (loginForm) loginForm.style.display = 'block';
+            });
+        }
+
+        // Event listeners para os botões de ação
+        const btnLogin = document.getElementById('btnLogin');
+        if (btnLogin) {
+            btnLogin.addEventListener('click', () => {
+                const email = document.getElementById('loginEmail').value;
+                const senha = document.getElementById('loginSenha').value;
+                if (!email || !senha) {
+                    displayAuthFeedback('Preencha email e senha.', 'error');
+                    return;
+                }
+                if (typeof logarUsuario === 'function') {
+                    logarUsuario(email, senha);
+                } else {
+                    console.error('Função logarUsuario não definida. Verifique auth.js');
+                }
+            });
+        }
+
+        const btnRegister = document.getElementById('btnRegister');
+        if (btnRegister) {
+            btnRegister.addEventListener('click', () => {
+                const email = document.getElementById('registerEmail').value;
+                const senha = document.getElementById('registerSenha').value;
+                if (!email || !senha) {
+                    displayAuthFeedback('Preencha email e senha.', 'error');
+                    return;
+                }
+                if (typeof registrarUsuario === 'function') {
+                    registrarUsuario(email, senha);
+                } else {
+                    console.error('Função registrarUsuario não definida. Verifique auth.js');
+                }
+            });
+        }
+
+        const btnSendPasswordReset = document.getElementById('btnSendPasswordReset'); // Agora este elemento existe
+        if (btnSendPasswordReset) {
+            btnSendPasswordReset.addEventListener('click', () => {
+                const email = document.getElementById('resetEmail').value;
+                if (typeof enviarEmailRecuperacaoSenha === 'function') {
+                    enviarEmailRecuperacaoSenha(email);
+                } else {
+                    console.error('Função enviarEmailRecuperacaoSenha não definida. Verifique auth.js');
+                }
+            });
+        }
+
+        // Função para exibir feedback
+        function displayAuthFeedback(message, type) {
+            if (authFeedback) {
+                authFeedback.textContent = message;
+                authFeedback.className = `alert alert-${type}`;
+                authFeedback.style.display = 'block';
+            } else {
+                console.error("Elemento #auth-feedback não encontrado no DOM para exibir mensagem:", message);
+            }
+        }
+    </script>
+</body>
+</html>

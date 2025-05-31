@@ -1,0 +1,95 @@
+/* css/auth.css */
+body.auth-page { /* Você pode adicionar class="auth-page" ao body do index.html se quiser isolar mais os estilos */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh; /* Garante que o container ocupe a tela toda */
+    padding: 20px;
+}
+
+.auth-box {
+    background-color: white;
+    padding: 30px 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 450px;
+    text-align: center;
+}
+
+.auth-box h1 {
+    color: #667eea;
+    margin-bottom: 10px;
+    font-size: 1.8em; /* Ajustado para caber melhor */
+}
+.auth-box h1 i {
+    margin-right: 8px;
+}
+
+
+.auth-box h2 {
+    color: #333;
+    margin-bottom: 25px;
+    font-size: 1.5em;
+}
+
+.auth-box .form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.auth-box .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #555;
+}
+
+.auth-box .form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1em;
+}
+
+.auth-box .btn { /* Herda de style.css mas podemos ajustar */
+    width: 100%;
+    padding: 12px;
+    font-size: 1.1em;
+    margin-top: 10px;
+}
+
+.auth-box .toggle-form {
+    margin-top: 20px;
+    font-size: 0.9em;
+}
+
+.auth-box .toggle-form a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 600;
+}
+.auth-box .toggle-form a:hover {
+    text-decoration: underline;
+}
+
+/* Feedback messages styling within auth-box */
+#auth-feedback {
+    position: static; /* Override fixed positioning from general .alert */
+    transform: none;
+    left: auto;
+    top: auto;
+    width: 100%;
+    box-sizing: border-box; /* Ensure padding is included in width */
+    margin-top: 15px;
+}
