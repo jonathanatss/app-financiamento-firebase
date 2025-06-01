@@ -4,38 +4,48 @@ let dados = {
     pagamentos: [],
     metasDePagamento: [],
     configuracoes: { valorImovel: 0, valorFinanciado: 0, inccBase: 100 },
-    historicoINCC: [] 
+    historicoINCC: []
 };
 
-// NOVA FUNÇÃO HELPER
+// --- FUNÇÕES HELPER ---
 function updateFormattedInputDisplay(inputId, displaySpanId, prefixText = "Equivalente a: R$ ") {
     const inputElement = document.getElementById(inputId);
     const displayElement = document.getElementById(displaySpanId);
     
     if (!inputElement || !displayElement) {
-        // console.warn("Input or display element not found for", inputId, displaySpanId);
         return;
     }
-
     const rawValue = parseFloat(inputElement.value);
-
-    if (inputElement.value.trim() === '' || isNaN(rawValue)) { // Handle empty or non-numeric input
-        displayElement.textContent = ''; // Clear display if input is empty or not a number
+    if (inputElement.value.trim() === '' || isNaN(rawValue)) {
+        displayElement.textContent = '';
     } else {
         displayElement.textContent = prefixText + rawValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 }
 
+// NOVA FUNÇÃO HELPER: Formatar Moeda
+function formatarMoeda(valor) {
+    if (typeof valor !== 'number' || isNaN(valor)) {
+        valor = 0;
+    }
+    return `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
+// --- DADOS E PERSISTÊNCIA ---
 function carregarDados() {
     try {
         const dadosSalvos = localStorage.getItem('financiamentoData');
         if (dadosSalvos) {
             const dadosParseados = JSON.parse(dadosSalvos);
-            dados = {
-                pagantes: [], pagamentos: [], metasDePagamento: [], configuracoes: { valorImovel: 0, valorFinanciado: 0, inccBase: 100 }, historicoINCC: [],
-                ...dadosParseados
+            // Garante que a estrutura base exista antes de espalhar os dados parseados
+            const estruturaBase = {
+                pagantes: [], pagamentos: [], metasDePagamento: [], 
+                configuracoes: { valorImovel: 0, valorFinanciado: 0, inccBase: 100 }, 
+                historicoINCC: []
             };
+            dados = { ...estruturaBase, ...dadosParseados };
+
+            // Garante que as arrays principais existam
             if (!Array.isArray(dados.pagantes)) dados.pagantes = [];
             if (!Array.isArray(dados.pagamentos)) dados.pagamentos = [];
             if (!Array.isArray(dados.metasDePagamento)) dados.metasDePagamento = [];
@@ -44,6 +54,7 @@ function carregarDados() {
     } catch (error) {
         console.error("Erro ao carregar dados do localStorage:", error);
         mostrarAlerta("Erro ao carregar dados. Alguns dados podem ter sido resetados.", "error");
+        // Reset para a estrutura base em caso de erro grave
         dados = { pagantes: [], pagamentos: [], metasDePagamento: [], configuracoes: { valorImovel: 0, valorFinanciado: 0, inccBase: 100 }, historicoINCC: [] };
     }
 }
@@ -52,17 +63,47 @@ function salvarDados() {
     localStorage.setItem('financiamentoData', JSON.stringify(dados));
 }
 
-function showSection(sectionId) {
+// --- NAVEGAÇÃO E UI GERAL ---
+function showSection(sectionId, clickedButtonElement) { // Adicionado clickedButtonElement
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    
     const sectionToShow = document.getElementById(sectionId);
     if (sectionToShow) sectionToShow.classList.add('active');
-    const activeButton = document.querySelector(`.nav-btn[onclick*="'${sectionId}'"]`);
-    if(activeButton) activeButton.classList.add('active');
-    atualizarInterfaceCompleta();
+    
+    if (clickedButtonElement) { // Marca o botão clicado como ativo
+        clickedButtonElement.classList.add('active');
+    } else { // Fallback para encontrar o botão se não foi passado (raro, mas seguro)
+        const activeButton = document.querySelector(`.nav-btn[onclick*="'${sectionId}'"]`);
+        if(activeButton) activeButton.classList.add('active');
+    }
+    
+    if (sectionId === 'dashboard') {
+        // Ao mostrar o dashboard, popula os seletores (caso dados tenham mudado)
+        // e atualiza a visão do dashboard com os filtros atuais.
+        popularSelectAnoDashboardFiltro(); // Garante que os anos estão atualizados
+        const mesSelect = document.getElementById('selectMesDashboardFiltro');
+        const anoSelect = document.getElementById('selectAnoDashboardFiltro');
+        const mes = mesSelect ? mesSelect.value : "";
+        const ano = anoSelect ? anoSelect.value : "";
+        atualizarDashboard(mes, ano);
+    } else {
+        // Para outras seções, a atualizarInterfaceCompleta cuidará de chamar atualizarDashboard
+        // com os filtros padrão (ou os últimos aplicados se você implementar persistência de filtro)
+        // Se você só quer que o dashboard padrão (sem filtro ou com filtro "Todos") seja
+        // mostrado quando outras partes da UI são atualizadas, isso já está coberto.
+    }
+     if (typeof atualizarInterfaceCompleta === 'function' && sectionId !== 'dashboard') {
+        // A atualizarInterfaceCompleta pode chamar atualizarDashboard globalmente.
+        // Se atualizarDashboard for modificada para aceitar filtros, ela precisa de valores padrão.
+        // Por hora, a lógica de atualização do dashboard está concentrada no if (sectionId === 'dashboard')
+        // e no botão "Aplicar".
+    }
 }
 
 function openModal(modalId) {
+    // Seu código openModal existente...
+    // (O código que você forneceu para openModal parece bom)
     const modal = document.getElementById(modalId);
     if (!modal) return;
 
@@ -79,13 +120,6 @@ function openModal(modalId) {
             document.getElementById('modalPagamentoTitle').textContent = title;
             document.getElementById('btnSubmitPagamento').innerHTML = buttonText;
             popularSelectMetas();
-            // A chamada para gerenciarCamposContribuicao é feita em abrirModalEdicaoPagamento
-            // ou implicitamente ao abrir para novo se não houver ID de edição.
-            // Se estiver abrindo para um novo pagamento, gerenciarCamposContribuicao será chamado por abrirModalEdicaoPagamento (com null)
-            // ou se for um clique direto em "Adicionar Pagamento" sem passar por abrirModalEdicaoPagamento, precisa garantir que campos de contribuição
-            // são inicializados se necessário.
-            // A função abrirModalEdicaoPagamento já lida com a lógica de popular e exibir os campos de contribuição.
-            // Apenas certificando que `gerenciarCamposContribuicao` é chamado corretamente no fluxo de edição/novo.
             break;
         case 'modalPagante':
             title = idPaganteEditandoField.value ? 'Editar Pagante' : 'Adicionar Pagante';
@@ -98,7 +132,6 @@ function openModal(modalId) {
             buttonText = idMetaEditandoField.value ? '<i class="fas fa-save"></i> Salvar Alterações' : '<i class="fas fa-plus"></i> Adicionar Meta';
             document.getElementById('modalMetaTitle').textContent = title;
             document.getElementById('btnSalvarMeta').innerHTML = buttonText;
-            // A limpeza do span e atualização é feita em openModalMeta
             break;
     }
     modal.style.display = 'block';
@@ -106,6 +139,7 @@ function openModal(modalId) {
 }
 
 function closeModal(modalId) {
+    // Seu código closeModal existente...
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.style.display = 'none';
@@ -114,32 +148,33 @@ function closeModal(modalId) {
     limparFormularios(modalId);
 }
 
-function limparFormularios(modalId) { // ATUALIZADA
+function limparFormularios(modalId) { 
+    // Seu código limparFormularios existente...
     const modal = document.getElementById(modalId);
     if (modal) {
         const form = modal.querySelector('form');
         if (form) form.reset();
-
-        // Limpa os spans de display formatado dentro do modal específico
         const formattedSpans = modal.querySelectorAll('.formatted-input-display');
         formattedSpans.forEach(span => span.textContent = '');
-
         if (modalId === 'modalPagamento') {
             document.getElementById('idPagamentoEditando').value = '';
-            document.getElementById('camposContribuicaoPagantes').innerHTML = ''; // Limpa campos dinâmicos
+            document.getElementById('camposContribuicaoPagantes').innerHTML = '';
             document.getElementById('blocoContribuicoesPagantes').style.display = 'none';
-            // O span formattedValorPagamentoDisplay é limpo pelo querySelectorAll acima
             validarSomaContribuicoes(); 
         } else if (modalId === 'modalPagante') {
             document.getElementById('idPaganteEditando').value = '';
         } else if (modalId === 'modalMeta') {
             document.getElementById('idMeta').value = '';
             document.getElementById('metaPrincipalDashboard').checked = false;
-            // O span formattedValorTotalMetaDisplay é limpo pelo querySelectorAll acima
         }
     }
 }
 
+
+// --- PAGANTES ---
+// Suas funções salvarPagante, abrirModalEdicaoPaganteComDados, removerPagante, 
+// atualizarListaPagantes, atualizarNomesPagantesNosRateiosEDisplay existentes...
+// (O código que você forneceu parece bom)
 function salvarPagante(event) {
     event.preventDefault();
     const id = document.getElementById('idPaganteEditando').value;
@@ -229,15 +264,20 @@ function atualizarNomesPagantesNosRateiosEDisplay(paganteId, novoApelido) {
     }
 }
 
-function abrirModalEdicaoPagamento(pagamentoId) { // ATUALIZADA
+
+// --- PAGAMENTOS ---
+// Suas funções abrirModalEdicaoPagamento, gerenciarCamposContribuicao, validarSomaContribuicoes,
+// salvarPagamento, mesclarRateio, reavaliarStatusPagamento, marcarComoPago, removerPagamento,
+// atualizarListaPagamentos existentes...
+// (O código que você forneceu parece bom)
+function abrirModalEdicaoPagamento(pagamentoId) { 
     const form = document.getElementById('formPagamento');
     form.reset(); 
     document.getElementById('idPagamentoEditando').value = pagamentoId || '';
     
     const formattedDisplaySpan = document.getElementById('formattedValorPagamentoDisplay');
-    if (formattedDisplaySpan) formattedDisplaySpan.textContent = ''; // Limpa o span de formatação do valor total
-    document.getElementById('camposContribuicaoPagantes').innerHTML = ''; // Limpa os campos de contribuição e seus spans de formatação
-
+    if (formattedDisplaySpan) formattedDisplaySpan.textContent = '';
+    document.getElementById('camposContribuicaoPagantes').innerHTML = '';
 
     if (pagamentoId) {
         const pagamento = dados.pagamentos.find(p => p.id === pagamentoId);
@@ -247,23 +287,22 @@ function abrirModalEdicaoPagamento(pagamentoId) { // ATUALIZADA
             document.getElementById('valorPagamento').value = pagamento.valor;
             document.getElementById('dataPagamento').value = pagamento.dataVencimento;
             document.getElementById('vincularMetaPagamento').value = pagamento.idMetaPagamento || "";
-            updateFormattedInputDisplay('valorPagamento', 'formattedValorPagamentoDisplay'); // Atualiza o span para o valor preenchido
+            updateFormattedInputDisplay('valorPagamento', 'formattedValorPagamentoDisplay'); 
         } else {
             mostrarAlerta('Pagamento não encontrado para edição!', 'error');
             document.getElementById('idPagamentoEditando').value = '';
         }
     }
-    updateTipoPagamento(); // Pode preencher a descrição
-    openModal('modalPagamento'); // Abre o modal
-     // gerenciarCamposContribuicao é chamado dentro de openModal se for para edição ou aqui se for novo
+    updateTipoPagamento(); 
+    openModal('modalPagamento'); 
     gerenciarCamposContribuicao(pagamentoId ? dados.pagamentos.find(p=>p.id === parseInt(pagamentoId)) : null);
 }
 
-function gerenciarCamposContribuicao(pagamentoExistente = null) { // ATUALIZADA
+function gerenciarCamposContribuicao(pagamentoExistente = null) { 
     const containerCampos = document.getElementById('camposContribuicaoPagantes');
     const blocoContribuicoes = document.getElementById('blocoContribuicoesPagantes');
     const valorTotalInput = document.getElementById('valorPagamento');
-    containerCampos.innerHTML = ''; // Limpa campos anteriores e seus spans de formatação
+    containerCampos.innerHTML = ''; 
 
     if (dados.pagantes.length === 0) {
         blocoContribuicoes.style.display = 'none';
@@ -284,12 +323,7 @@ function gerenciarCamposContribuicao(pagamentoExistente = null) { // ATUALIZADA
         if (pagamentoExistente && pagamentoExistente.rateio) {
             const rateioPagante = pagamentoExistente.rateio.find(r => r.pagante_id === pagante.id);
             if (rateioPagante) valorContribuido = rateioPagante.valor;
-        } else if (!pagamentoExistente && index === 0 && valorTotalAtual > 0 && dados.pagantes.length > 0) {
-            // Se for novo pagamento e mais de um pagante, e valor total preenchido, atribui ao primeiro.
-            // Isso é mais uma sugestão, o usuário ajustará.
-            // valorContribuido = valorTotalAtual; // Removido para não pré-preencher automaticamente se não for edição
         }
-
         const div = document.createElement('div');
         div.className = 'form-group-contrib';
         const inputId = `contrib-${pagante.id}`;
@@ -302,7 +336,7 @@ function gerenciarCamposContribuicao(pagamentoExistente = null) { // ATUALIZADA
                    step="0.01" min="0" oninput="validarSomaContribuicoes(); updateFormattedInputDisplay('${inputId}', '${displaySpanId}');">
             <span id="${displaySpanId}" class="formatted-input-display" style="margin-left: 40%;"></span>`;
         containerCampos.appendChild(div);
-        updateFormattedInputDisplay(inputId, displaySpanId); // Atualiza o display formatado para o valor inicial
+        updateFormattedInputDisplay(inputId, displaySpanId); 
     });
     validarSomaContribuicoes();
 }
@@ -361,7 +395,7 @@ function salvarPagamento(event) {
             }
         });
         if (Math.abs(valor - somaContribParaValidacao) > 0.001) {
-            return mostrarAlerta('A soma das contribuições dos pagantes (R$ ' + somaContribParaValidacao.toFixed(2) + ') não corresponde ao Valor Total do pagamento (R$ ' + valor.toFixed(2) + ').', 'warning');
+            return mostrarAlerta('A soma das contribuições (R$ ' + somaContribParaValidacao.toFixed(2) + ') não bate com o Valor Total (R$ ' + valor.toFixed(2) + ').', 'warning');
         }
     } else if (dados.pagantes.length === 1) {
         const paganteUnico = dados.pagantes[0];
@@ -448,7 +482,8 @@ function marcarComoPago(pagamentoId, paganteId = null) {
     if (pagamento.idMetaPagamento) calcularSaldoDeMeta(pagamento.idMetaPagamento);
     salvarDados();
     atualizarListaPagamentos();
-    atualizarDashboard();
+    // MODIFICADO: Chamar atualizarInterfaceCompleta que já chama o dashboard com filtro
+    atualizarInterfaceCompleta(); 
 }
 
 function removerPagamento(id) {
@@ -483,7 +518,7 @@ function atualizarListaPagamentos() {
                 <div class="item-info">
                     <h4>${p.descricao}</h4>
                     <p><strong>Tipo:</strong> ${getTipoNome(p.tipo)}</p>
-                    <p><strong>Valor Total:</strong> R$ ${p.valor.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
+                    <p><strong>Valor Total:</strong> ${formatarMoeda(p.valor)}</p>
                     <p><strong>Vencimento:</strong> ${dataVenc.toLocaleDateString('pt-BR')}</p>
                     <span class="status ${sClass}">${sText}</span>
                     ${(p.rateio && p.rateio.length > 0) ? `
@@ -492,7 +527,7 @@ function atualizarListaPagamentos() {
                             const percentualContribuicao = (p.valor > 0 && r.valor > 0) ? (r.valor / p.valor) * 100 : 0;
                             return `
                             <div class="rateio-detalhe-item" style="background:${r.pago ? '#e6fffa':'#fff5f5'};">
-                                <span>${r.nome}: R$ ${r.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})} 
+                                <span>${r.nome}: ${formatarMoeda(r.valor)} 
                                     <span style="color: #007bff; font-weight: bold;">(${percentualContribuicao.toFixed(1)}%)</span>
                                 </span>
                                 ${r.valor > 0 ? `<button class="btn" data-rateio-btn="true" style="background-color:${r.pago?'#28a745':'#6c757d'};color:white;" onclick="marcarComoPago(${p.id},${r.pagante_id})">${r.pago?'<i class="fas fa-check-circle"></i> Pago':'Marcar'}</button>` : ''}
@@ -514,12 +549,17 @@ function atualizarListaPagamentos() {
         }).join('');
 }
 
-function openModalMeta(metaId = null) { // ATUALIZADA
+
+// --- METAS ---
+// Suas funções openModalMeta, handleMetaPrincipalCheckbox, salvarMeta, removerMeta,
+// calcularSaldoDeMeta, calcularTodosSaldosDeMetas, atualizarListaMetas, popularSelectMetas existentes...
+// (O código que você forneceu parece bom)
+function openModalMeta(metaId = null) { 
     const form = document.getElementById('formMeta'); form.reset();
     document.getElementById('idMeta').value = metaId || '';
     
     const formattedDisplaySpan = document.getElementById('formattedValorTotalMetaDisplay');
-    if(formattedDisplaySpan) formattedDisplaySpan.textContent = ''; // Limpa o span de formatação
+    if(formattedDisplaySpan) formattedDisplaySpan.textContent = ''; 
 
     if (metaId) {
         const meta = dados.metasDePagamento.find(m => m.id === metaId);
@@ -527,7 +567,7 @@ function openModalMeta(metaId = null) { // ATUALIZADA
             document.getElementById('nomeMeta').value = meta.nome;
             document.getElementById('valorTotalMeta').value = meta.valorTotal;
             document.getElementById('metaPrincipalDashboard').checked = meta.principalNoDashboard || false;
-            updateFormattedInputDisplay('valorTotalMeta', 'formattedValorTotalMetaDisplay'); // Atualiza o span para o valor preenchido
+            updateFormattedInputDisplay('valorTotalMeta', 'formattedValorTotalMetaDisplay'); 
         }
     } else {
         document.getElementById('metaPrincipalDashboard').checked = false;
@@ -536,7 +576,7 @@ function openModalMeta(metaId = null) { // ATUALIZADA
 }
 
 function handleMetaPrincipalCheckbox(checkbox) {
-    // A lógica de desmarcar outras é feita no salvarMeta para garantir consistência
+    // A lógica é tratada em salvarMeta
 }
 
 function salvarMeta(event) {
@@ -546,7 +586,7 @@ function salvarMeta(event) {
     const valorTotal = parseFloat(document.getElementById('valorTotalMeta').value);
     const principalNoDashboard = document.getElementById('metaPrincipalDashboard').checked;
 
-    if (!nome || isNaN(valorTotal) || valorTotal <= 0) return mostrarAlerta('Nome e valor total válidos são obrigatórios para a meta.', 'warning');
+    if (!nome || isNaN(valorTotal) || valorTotal <= 0) return mostrarAlerta('Nome e valor total válidos são obrigatórios.', 'warning');
 
     const idNumerico = id ? parseInt(id) : null;
 
@@ -566,7 +606,7 @@ function salvarMeta(event) {
     } else { 
         const novaMetaId = Date.now();
         dados.metasDePagamento.push({ id: novaMetaId, nome, valorTotal, valorPago: 0, principalNoDashboard });
-        if (principalNoDashboard) { // Se a nova foi marcada como principal, garantir que é a única
+        if (principalNoDashboard) { 
             dados.metasDePagamento.forEach(m => { if(m.id !== novaMetaId) m.principalNoDashboard = false; });
         }
     }
@@ -620,9 +660,9 @@ function atualizarListaMetas() {
                         </div>
                     </div>
                     <div class="item-meta-details" style="margin-top:10px;">
-                        <p><strong>Total da Meta:</strong> R$ ${m.valorTotal.toLocaleString('pt-BR',{minimumFractionDigits:2})}</p>
-                        <p><strong>Total Pago para esta Meta:</strong> R$ ${m.valorPago.toLocaleString('pt-BR',{minimumFractionDigits:2})}</p>
-                        <p><strong>Saldo Devedor da Meta:</strong> <span style="color:${saldoDevedor > 0 ? '#c53030':'#22543d'};font-weight:bold;">R$ ${saldoDevedor.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></p>
+                        <p><strong>Total da Meta:</strong> ${formatarMoeda(m.valorTotal)}</p>
+                        <p><strong>Total Pago para esta Meta:</strong> ${formatarMoeda(m.valorPago)}</p>
+                        <p><strong>Saldo Devedor da Meta:</strong> <span style="color:${saldoDevedor > 0 ? '#c53030':'#22543d'};font-weight:bold;">${formatarMoeda(saldoDevedor)}</span></p>
                     </div>
                     <div class="meta-progress-bar"><div class="meta-progress-fill" style="width:${progresso.toFixed(1)}%;" title="${progresso.toFixed(1)}% Concluído">${progresso.toFixed(0)}%</div></div>
                 </div>
@@ -638,6 +678,10 @@ function popularSelectMetas() {
     select.value = valorSelecionadoAntes; 
 }
 
+
+// --- INCC ---
+// Suas funções analisarReajusteINCC, atualizarHistoricoAnalisesINCC existentes...
+// (O código que você forneceu parece bom)
 function analisarReajusteINCC() {
     const valorParcelaOriginalEl = document.getElementById('valorParcelaOriginal');
     const valorParcelaPagaEl = document.getElementById('valorParcelaPagaComINCC');
@@ -659,7 +703,7 @@ function analisarReajusteINCC() {
     const valorReajuste = valorParcelaPagaComINCC - valorParcelaOriginal;
     const percentualReajuste = (valorParcelaOriginal !== 0) ? (valorReajuste / valorParcelaOriginal) * 100 : 0;
 
-    valorDoReajusteEl.value = `R$ ${valorReajuste.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    valorDoReajusteEl.value = formatarMoeda(valorReajuste);
     percentualDoReajusteEl.value = `${percentualReajuste.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%`;
     
     const corReajuste = valorReajuste >= 0 ? '#c53030' : '#22543d'; 
@@ -690,31 +734,113 @@ function atualizarHistoricoAnalisesINCC() {
         historicoFiltrado.slice(-5).reverse().map(h => `
             <div class="item"><div class="item-info">
                 <h4>Análise de ${h.data}</h4>
-                <p><strong>Original da Parcela:</strong> R$ ${h.valorParcelaOriginal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                <p><strong>Pago com INCC:</strong> R$ ${h.valorParcelaPaga.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                <p><strong>Valor do Reajuste:</strong> <span style="color: ${h.valorReajuste >= 0 ? '#c53030' : '#22543d'}; font-weight: bold;">${h.valorReajuste >= 0 ? '+' : ''}R$ ${h.valorReajuste.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></p>
+                <p><strong>Original da Parcela:</strong> ${formatarMoeda(h.valorParcelaOriginal)}</p>
+                <p><strong>Pago com INCC:</strong> ${formatarMoeda(h.valorParcelaPaga)}</p>
+                <p><strong>Valor do Reajuste:</strong> <span style="color: ${h.valorReajuste >= 0 ? '#c53030' : '#22543d'}; font-weight: bold;">${h.valorReajuste >= 0 ? '+' : ''}${formatarMoeda(h.valorReajuste)}</span></p>
                 <p><strong>Percentual de Reajuste:</strong> <span style="font-weight: bold; color: ${h.percentualReajuste >= 0 ? '#c53030' : '#22543d'};">${h.percentualReajuste.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</span></p>
             </div></div>`).join('');
 }
 
-function atualizarDashboard() {
-    const totalLancado = dados.pagamentos.reduce((acc, p) => acc + p.valor, 0);
-    let totalPagoEfetivo = 0;
-    dados.pagamentos.forEach(p => {
+
+// --- DASHBOARD (MODIFICADO E NOVAS FUNÇÕES) ---
+
+// NOVA: Função para popular o seletor de meses do filtro do dashboard
+function popularSelectMesDashboardFiltro() {
+    const selectMes = document.getElementById('selectMesDashboardFiltro');
+    if (!selectMes) return;
+
+    const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    selectMes.innerHTML = '<option value="">Todos os Meses</option>';
+    mesesNomes.forEach((nome, index) => {
+        const option = document.createElement('option');
+        option.value = index; // 0 para Janeiro
+        option.textContent = nome;
+        selectMes.appendChild(option);
+    });
+}
+
+// NOVA: Função para popular o seletor de anos do filtro do dashboard
+function popularSelectAnoDashboardFiltro() {
+    const selectAno = document.getElementById('selectAnoDashboardFiltro');
+    if (!selectAno) return;
+
+    const anosUnicos = new Set();
+    if (dados && dados.pagamentos && Array.isArray(dados.pagamentos)) {
+        dados.pagamentos.forEach(p => {
+            if (p.dataVencimento) {
+                try {
+                    anosUnicos.add(new Date(p.dataVencimento + "T00:00:00").getFullYear());
+                } catch (e) { console.warn("Data de vencimento inválida:", p.dataVencimento); }
+            }
+        });
+    }
+    if (anosUnicos.size === 0) { // Adiciona ano atual se não houver dados ou anos
+        anosUnicos.add(new Date().getFullYear());
+    }
+
+    selectAno.innerHTML = '<option value="">Todos os Anos</option>';
+    Array.from(anosUnicos).sort((a, b) => b - a).forEach(ano => {
+        const option = document.createElement('option');
+        option.value = ano;
+        option.textContent = ano;
+        selectAno.appendChild(option);
+    });
+}
+
+// MODIFICADA: atualizarDashboard agora aceita filtros
+function atualizarDashboard(mesFiltro = "", anoFiltro = "") {
+    const mesAlvo = (mesFiltro !== "" && mesFiltro !== null) ? parseInt(mesFiltro) : null;
+    const anoAlvo = (anoFiltro !== "" && anoFiltro !== null) ? parseInt(anoFiltro) : null;
+
+    let pagamentosParaCalculo = dados.pagamentos;
+
+    if (anoAlvo !== null) {
+        pagamentosParaCalculo = pagamentosParaCalculo.filter(p => {
+            if (!p.dataVencimento) return false;
+            try { return new Date(p.dataVencimento + "T00:00:00").getFullYear() === anoAlvo; }
+            catch (e) { return false; }
+        });
+    }
+    if (mesAlvo !== null) {
+        pagamentosParaCalculo = pagamentosParaCalculo.filter(p => {
+            if (!p.dataVencimento) return false;
+            try { return new Date(p.dataVencimento + "T00:00:00").getMonth() === mesAlvo; }
+            catch (e) { return false; }
+        });
+    }
+
+    // Calcula totais para os cards com base nos pagamentos filtrados (ou todos se não houver filtro)
+    const totalLancadoCards = pagamentosParaCalculo.reduce((acc, p) => acc + p.valor, 0);
+    let totalPagoEfetivoCards = 0;
+    pagamentosParaCalculo.forEach(p => {
         if (p.rateio && p.rateio.length > 0) {
-            totalPagoEfetivo += p.rateio.reduce((accRateio, r) => accRateio + (r.pago ? r.valor : 0), 0);
-        } else if (p.status === 'pago' && (!p.rateio || p.rateio.length === 0) ) { 
-            totalPagoEfetivo += p.valor;
+            totalPagoEfetivoCards += p.rateio.reduce((accRateio, r) => accRateio + (r.pago ? r.valor : 0), 0);
+        } else if (p.status === 'pago' && (!p.rateio || p.rateio.length === 0)) {
+            totalPagoEfetivoCards += p.valor;
         }
     });
-    const totalPendente = totalLancado - totalPagoEfetivo;
-    const progresso = totalLancado > 0 ? (totalPagoEfetivo / totalLancado) * 100 : 0;
+    const totalPendenteCards = totalLancadoCards - totalPagoEfetivoCards;
 
-    document.getElementById('totalPago').textContent = `R$ ${totalPagoEfetivo.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-    document.getElementById('totalPendente').textContent = `R$ ${totalPendente.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-    document.getElementById('totalGeral').textContent = `R$ ${totalLancado.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-    document.getElementById('progressFill').style.width = `${progresso}%`;
-    document.getElementById('progressText').textContent = `${Math.round(progresso)}%`;
+    document.getElementById('totalPago').textContent = formatarMoeda(totalPagoEfetivoCards);
+    document.getElementById('totalPendente').textContent = formatarMoeda(totalPendenteCards);
+    document.getElementById('totalGeral').textContent = formatarMoeda(totalLancadoCards);
+
+    // --- Lógica para Progresso Geral Global e Meta Principal (NÃO FILTRADA POR MÊS/ANO) ---
+    const totalLancadoGlobal = dados.pagamentos.reduce((acc, p) => acc + p.valor, 0);
+    let totalPagoEfetivoGlobal = 0;
+    dados.pagamentos.forEach(p => {
+        if (p.rateio && p.rateio.length > 0) {
+            totalPagoEfetivoGlobal += p.rateio.reduce((accRateio, r) => accRateio + (r.pago ? r.valor : 0), 0);
+        } else if (p.status === 'pago' && (!p.rateio || p.rateio.length === 0) ) { 
+            totalPagoEfetivoGlobal += p.valor;
+        }
+    });
+    const progressoGlobal = totalLancadoGlobal > 0 ? (totalPagoEfetivoGlobal / totalLancadoGlobal) * 100 : 0;
+    
+    const progressFillEl = document.getElementById('progressFill');
+    const progressTextEl = document.getElementById('progressText');
+    if(progressFillEl) progressFillEl.style.width = `${progressoGlobal.toFixed(1)}%`;
+    if(progressTextEl) progressTextEl.textContent = `${Math.round(progressoGlobal)}%`;
     
     const metaPrincipal = dados.metasDePagamento.find(m => m.principalNoDashboard);
     const cardMetaEl = document.getElementById('cardMetaPrincipalDashboard');
@@ -722,20 +848,22 @@ function atualizarDashboard() {
         calcularSaldoDeMeta(metaPrincipal.id); 
         const saldoDevMeta = metaPrincipal.valorTotal - metaPrincipal.valorPago;
         const progMeta = metaPrincipal.valorTotal > 0 ? (metaPrincipal.valorPago / metaPrincipal.valorTotal) * 100 : 0;
+        
         document.getElementById('nomeMetaPrincipalDashboard').innerHTML = `<i class="fas fa-piggy-bank"></i> ${metaPrincipal.nome}`;
-        document.getElementById('saldoDevedorMetaPrincipal').textContent = `R$ ${saldoDevMeta.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-        document.getElementById('valorTotalMetaPrincipal').textContent = `R$ ${metaPrincipal.valorTotal.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-        document.getElementById('valorPagoMetaPrincipal').textContent = `R$ ${metaPrincipal.valorPago.toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
+        document.getElementById('saldoDevedorMetaPrincipal').textContent = formatarMoeda(saldoDevMeta);
+        document.getElementById('valorTotalMetaPrincipal').textContent = formatarMoeda(metaPrincipal.valorTotal);
+        document.getElementById('valorPagoMetaPrincipal').textContent = formatarMoeda(metaPrincipal.valorPago);
         document.getElementById('progressFillMetaPrincipal').style.width = `${progMeta.toFixed(1)}%`;
         document.getElementById('progressTextMetaPrincipal').textContent = `${Math.round(progMeta)}%`;
         cardMetaEl.style.display = 'block';
     } else if (cardMetaEl) {
         cardMetaEl.style.display = 'none';
     }
-    atualizarProximosVencimentos();
+    atualizarProximosVencimentos(); // Esta função também é global
 }
 
 function atualizarProximosVencimentos() {
+    // Seu código atualizarProximosVencimentos existente...
     const container = document.getElementById('proximosVencimentos');
     if (!container) return;
     const hoje = new Date(); hoje.setHours(0,0,0,0);
@@ -753,21 +881,22 @@ function atualizarProximosVencimentos() {
             const dataV = new Date(p.dataVencimento + "T00:00:00");
             const diasRest = Math.ceil((dataV - hoje) / (1000*60*60*24));
             let msg = diasRest === 0 ? 'Vence hoje' : (diasRest === 1 ? 'Vence amanhã' : `Vence em ${diasRest} dias`);
-            return `<div class="item" style="border-left:5px solid #667eea;margin-bottom:10px;"><div class="item-info" style="margin-bottom:0; padding-right:0;"><h4>${p.descricao}</h4><p><strong>Valor:</strong> R$ ${p.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})}</p><p><strong>Vencimento:</strong> ${dataV.toLocaleDateString('pt-BR')}</p><span class="status pendente" style="background-color:#ffe0b2;color:#b7791f;">${msg}</span></div></div>`;
+            return `<div class="item" style="border-left:5px solid #667eea;margin-bottom:10px;"><div class="item-info" style="margin-bottom:0; padding-right:0;"><h4>${p.descricao}</h4><p><strong>Valor:</strong> ${formatarMoeda(p.valor)}</p><p><strong>Vencimento:</strong> ${dataV.toLocaleDateString('pt-BR')}</p><span class="status pendente" style="background-color:#ffe0b2;color:#b7791f;">${msg}</span></div></div>`;
         }).join('');
     }
     container.innerHTML = html;
 }
 
+// --- RELATÓRIOS ---
+// Suas funções gerarRelatorioGeral, gerarRelatorioPagantes, getTipoNome, updateTipoPagamento existentes...
+// (O código que você forneceu parece bom)
 function gerarRelatorioGeral() {
     const container = document.getElementById('relatorioContent');
     if (!container) {
         console.error("Elemento #relatorioContent não encontrado!");
         return;
     }
-
     calcularTodosSaldosDeMetas(); 
-
     const totalLancado = dados.pagamentos.reduce((sum, p) => sum + p.valor, 0);
     let totalPagoEfetivo = 0;
     dados.pagamentos.forEach(p => {
@@ -806,28 +935,26 @@ function gerarRelatorioGeral() {
     let html = `<div class="card" style="margin-bottom:20px;text-align:left;background:white;color:#333;">
                     <h3><i class="fas fa-file-invoice-dollar"></i> Resumo Financeiro Geral (Lançamentos)</h3>
                     <p><strong>Total de Lançamentos de Pagamento:</strong> ${dados.pagamentos.length}</p>
-                    <p><strong>Valor Total Lançado:</strong> R$ ${totalLancado.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</p>
-                    <p><strong>Total Efetivamente Pago (Soma das Contribuições Pagas):</strong> R$ ${totalPagoEfetivo.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</p>
-                    <p><strong>Total Pendente nos Lançamentos:</strong> R$ ${totalPendenteLancamentos.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                    <p><strong>Valor Total Lançado:</strong> ${formatarMoeda(totalLancado)}</p>
+                    <p><strong>Total Efetivamente Pago:</strong> ${formatarMoeda(totalPagoEfetivo)}</p>
+                    <p><strong>Total Pendente nos Lançamentos:</strong> ${formatarMoeda(totalPendenteLancamentos)}</p>
                     <p><strong>Progresso Geral dos Lançamentos:</strong> ${progressoLancamentos.toFixed(1)}%</p>
                 </div>`;
-
     if (dados.metasDePagamento.length > 0) {
         html += `<div class="card" style="margin-bottom:20px;text-align:left;background:white;color:#333;">
                     <h3><i class="fas fa-bullseye"></i> Resumo Agregado das Metas</h3>
                     <p><strong>Quantidade de Metas Definidas:</strong> ${dados.metasDePagamento.length}</p>
-                    <p><strong>Valor Total de Todas as Metas:</strong> R$ ${valorTotalMetasDefinidas.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</p>
-                    <p><strong>Total Amortizado das Metas (Pago):</strong> R$ ${totalAmortizadoMetas.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</p>
-                    <p><strong>Saldo Devedor Total das Metas:</strong> R$ ${saldoDevedorTotalMetas.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                    <p><strong>Valor Total de Todas as Metas:</strong> ${formatarMoeda(valorTotalMetasDefinidas)}</p>
+                    <p><strong>Total Amortizado das Metas (Pago):</strong> ${formatarMoeda(totalAmortizadoMetas)}</p>
+                    <p><strong>Saldo Devedor Total das Metas:</strong> ${formatarMoeda(saldoDevedorTotalMetas)}</p>
                     <p><strong>Progresso Geral das Metas:</strong> ${progressoGeralMetas.toFixed(1)}%</p>
                 </div>`;
     } else {
-        html += `<div class="card" style="margin-bottom:20px;text-align:center;background:white;color:#666;"><p>Nenhuma meta de pagamento cadastrada para resumir.</p></div>`;
+        html += `<div class="card" style="margin-bottom:20px;text-align:center;background:white;color:#666;"><p>Nenhuma meta cadastrada.</p></div>`;
     }
-
     html += `<div class="card" style="text-align:left;background:white;color:#333;">
                 <h3><i class="fas fa-tasks"></i> Distribuição de Gastos Efetivos por Tipo</h3>`;
-    if (Object.keys(gastosPorTipo).length > 0 && totalPagoEfetivo >= 0) { // Permitir totalPagoEfetivo ser 0
+    if (Object.keys(gastosPorTipo).length > 0 && totalPagoEfetivo >= 0) {
         html += `<div class="pagamentos-list" style="margin-top:10px;">`; 
         for (const tipo in gastosPorTipo) {
             if (gastosPorTipo.hasOwnProperty(tipo)) {
@@ -838,7 +965,7 @@ function gerarRelatorioGeral() {
                     <div class="item-info" style="padding-right:10px; margin-bottom:0; flex-grow:3;">
                         <h4 style="margin-bottom:5px;">${tipo}</h4>
                         <p><strong>Qtde. Lançamentos:</strong> ${dadosTipo.count}</p>
-                        <p><strong>Total Pago (Tipo):</strong> R$ ${dadosTipo.totalPago.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                        <p><strong>Total Pago (Tipo):</strong> ${formatarMoeda(dadosTipo.totalPago)}</p>
                     </div>
                     <div style="text-align:right; flex-grow:1;">
                         <p style="font-size:1.2em; font-weight:bold; color:#007bff;">${percentualSobreTotalPago.toFixed(1)}%</p>
@@ -849,7 +976,7 @@ function gerarRelatorioGeral() {
         }
         html += `</div>`;
     } else {
-        html += `<p style="text-align:center; color:#666; margin-top:10px;">Nenhum pagamento efetivado para detalhar por tipo.</p>`;
+        html += `<p style="text-align:center; color:#666; margin-top:10px;">Nenhum pagamento efetivado.</p>`;
     }
     html += `</div>`;
     container.innerHTML = html;
@@ -859,7 +986,7 @@ function gerarRelatorioPagantes() {
     const container = document.getElementById('relatorioContent');
     if (!container) return;
     if (dados.pagantes.length === 0) {
-        container.innerHTML = '<p style="color:#666; text-align:center;">Nenhum pagante cadastrado para gerar relatório.</p>'; return;
+        container.innerHTML = '<p style="color:#666; text-align:center;">Nenhum pagante cadastrado.</p>'; return;
     }
     let html = '<h3><i class="fas fa-users"></i> Relatório de Contribuições por Pagante e Tipo</h3>';
     dados.pagantes.forEach(pagante => {
@@ -881,12 +1008,12 @@ function gerarRelatorioPagantes() {
         if (Object.keys(contribuicoesPorTipo).length > 0) {
             html += '<ul style="list-style-position: inside; padding-left: 0; margin-top:10px;">';
             for (const tipo in contribuicoesPorTipo) {
-                html += `<li style="margin-bottom: 5px;"><strong>${tipo}:</strong> R$ ${contribuicoesPorTipo[tipo].toLocaleString('pt-BR',{minimumFractionDigits:2})}</li>`;
+                html += `<li style="margin-bottom: 5px;"><strong>${tipo}:</strong> ${formatarMoeda(contribuicoesPorTipo[tipo])}</li>`;
             }
             html += '</ul>';
-            html += `<p style="margin-top:15px; border-top: 1px solid #eee; padding-top: 10px; font-weight:bold;">Total Geral Pago por ${pagante.apelido}: R$ ${totalPagoPeloPagante.toLocaleString('pt-BR',{minimumFractionDigits:2})}</p>`;
+            html += `<p style="margin-top:15px; border-top: 1px solid #eee; padding-top: 10px; font-weight:bold;">Total Geral Pago por ${pagante.apelido}: ${formatarMoeda(totalPagoPeloPagante)}</p>`;
         } else {
-            html += `<p style="color:#666; margin-top:10px;">Nenhuma contribuição paga registrada para este pagante.</p>`;
+            html += `<p style="color:#666; margin-top:10px;">Nenhuma contribuição paga registrada.</p>`;
         }
         html += `</div>`;
     });
@@ -905,43 +1032,53 @@ function updateTipoPagamento() {
         descInput.value = sugestoes[tipo] !== undefined ? sugestoes[tipo] : '';
     }
 }
+
+
+// --- ALERTAS, ATUALIZAÇÃO GERAL DA UI E INICIALIZAÇÃO ---
 function mostrarAlerta(mensagem, tipo = 'success') {
-    document.querySelectorAll('.alert').forEach(a => a.remove()); // Remove alertas antigos
+    // Seu código mostrarAlerta existente...
+    document.querySelectorAll('.alert').forEach(a => a.remove()); 
     const alerta = document.createElement('div');
-    alerta.className = `alert alert-${tipo}`;
+    alerta.className = `alert alert-${tipo}`; // Você precisará de estilos CSS para .alert e .alert-success/warning/error
     alerta.innerHTML = `<i class="fas fa-${tipo==='success'?'check-circle':(tipo==='warning'?'exclamation-triangle':'exclamation-circle')}"></i> ${mensagem}`;
-    
-    // Adiciona o alerta ao body para que o position:fixed funcione globalmente
-    // ou a um container específico se a position:fixed não for desejada.
-    // Se o alerta estiver dentro de .auth-box no index.html, ele não será fixed.
-    // Para app.html, ele será fixed no topo.
-    const containerParaAlerta = document.querySelector('.auth-box') || document.body;
-    if (containerParaAlerta === document.body) { // Alerta global para app.html
-        document.body.appendChild(alerta);
-    } else { // Alerta dentro do auth-box para index.html
-        //  No index.html, já temos um div #auth-feedback. Podemos usá-lo diretamente.
-        //  Esta função mostrarAlerta é mais genérica.
-        //  Para o caso específico do index.html, a função displayAuthFeedback é mais adequada.
-        //  Esta aqui servirá bem para app.html
-        document.body.appendChild(alerta); // Ainda assim, anexa ao body para ser global.
-    }
+    alerta.style.position = 'fixed'; // Para sobrepor outros elementos
+    alerta.style.top = '20px';
+    alerta.style.right = '20px';
+    alerta.style.padding = '15px';
+    alerta.style.borderRadius = '5px';
+    alerta.style.color = 'white';
+    alerta.style.zIndex = '10000';
+    alerta.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    if (tipo === 'success') alerta.style.backgroundColor = '#28a745';
+    else if (tipo === 'warning') alerta.style.backgroundColor = '#ffc107';
+    else if (tipo === 'error') alerta.style.backgroundColor = '#dc3545';
+    else alerta.style.backgroundColor = '#6c757d';
 
-
+    document.body.appendChild(alerta);
     setTimeout(() => alerta.remove(), 4000);
 }
 
+// MODIFICADA: atualizarInterfaceCompleta
 function atualizarInterfaceCompleta() {
     calcularTodosSaldosDeMetas();
     atualizarListaPagantes();
     atualizarListaPagamentos();
     atualizarListaMetas();
-    atualizarDashboard();
+    
+    popularSelectAnoDashboardFiltro(); // ATUALIZA O SELETOR DE ANOS DO FILTRO
+
+    // Atualiza o dashboard com os filtros atualmente selecionados (ou padrão "Todos")
+    const mesSelect = document.getElementById('selectMesDashboardFiltro');
+    const anoSelect = document.getElementById('selectAnoDashboardFiltro');
+    const mesFiltro = mesSelect ? mesSelect.value : "";
+    const anoFiltro = anoSelect ? anoSelect.value : "";
+    atualizarDashboard(mesFiltro, anoFiltro); // CHAMA O DASHBOARD MODIFICADO
+
     atualizarHistoricoAnalisesINCC(); 
     popularSelectMetas(); 
     if (document.getElementById('relatorios')?.classList.contains('active')) {
         document.getElementById('relatorioContent').innerHTML = '<p style="text-align:center; color:#666;"><i>Gere um novo relatório para ver os dados atualizados.</i></p>';
     }
-    // Limpar spans de formatação na seção INCC se ela estiver ativa e for apropriado
     if (document.getElementById('incc')?.classList.contains('active')) {
         const originalInccSpan = document.getElementById('formattedValorParcelaOriginalDisplay');
         const pagaInccSpan = document.getElementById('formattedValorParcelaPagaComINCCDisplay');
@@ -955,48 +1092,77 @@ function atualizarInterfaceCompleta() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Esta verificação é importante. Se estivermos na página app.html,
-    // a lógica de carregamento de dados e inicialização da UI principal deve ocorrer.
-    // O auth.js (que você vai criar) cuidará do redirecionamento.
-    // Se esta página (app.html) for carregada, significa que o usuário deve estar autenticado.
-    if (document.querySelector('.container')) { // Verifica se é a página da aplicação principal
+    if (document.querySelector('.container .nav-buttons')) { // Apenas na app.html
         carregarDados();
-        showSection('dashboard'); // Ou a última seção visitada, se você salvar essa preferência
-    }
+        
+        // Inicialização dos filtros do Dashboard
+        popularSelectMesDashboardFiltro();
+        popularSelectAnoDashboardFiltro(); // Agora populado com dados carregados
 
-    // Event listeners globais para modais (fechar com ESC ou clique fora)
-    // Movidos para cá para garantir que são adicionados apenas uma vez
-    window.onclick = event => { 
-        if (event.target.classList.contains('modal') && event.target.classList.contains('active-modal-display')) {
-            closeModal(event.target.id); 
+        // Define valores iniciais para os filtros (ex: "Todos")
+        const selectMesEl = document.getElementById('selectMesDashboardFiltro');
+        const selectAnoEl = document.getElementById('selectAnoDashboardFiltro');
+        if(selectMesEl) selectMesEl.value = ""; 
+        if(selectAnoEl) selectAnoEl.value = "";
+
+        // Listener para o botão de aplicar filtro do dashboard
+        const btnAplicarFiltroEl = document.getElementById('btnAplicarFiltroDashboard');
+        if (btnAplicarFiltroEl) {
+            btnAplicarFiltroEl.addEventListener('click', () => {
+                const mes = selectMesEl ? selectMesEl.value : "";
+                const ano = selectAnoEl ? selectAnoEl.value : "";
+                atualizarDashboard(mes, ano); // Chama o dashboard modificado
+            });
         }
-    };
-    window.addEventListener('keydown', event => { 
-        if (event.key === 'Escape' || event.key === 'Esc') {
-            document.querySelectorAll('.modal.active-modal-display').forEach(m => closeModal(m.id));
-        }
-    });
-    document.querySelectorAll('.modal .close').forEach(btn => {
-        btn.addEventListener('keydown', function(e){ 
-            if(e.key==='Enter'||e.key===' ') closeModal(this.closest('.modal').id); 
+        
+        showSection('dashboard', document.querySelector('.nav-btn[onclick*="dashboard"]')); // Mostra dashboard com filtros iniciais
+        
+        // Listeners globais para modais
+        window.onclick = event => { 
+            if (event.target.classList.contains('modal') && event.target.classList.contains('active-modal-display')) {
+                closeModal(event.target.id); 
+            }
+        };
+        window.addEventListener('keydown', event => { 
+            if (event.key === 'Escape' || event.key === 'Esc') {
+                document.querySelectorAll('.modal.active-modal-display').forEach(m => closeModal(m.id));
+            }
         });
-    });
+        document.querySelectorAll('.modal .close').forEach(btn => {
+            btn.addEventListener('keydown', function(e){ 
+                if(e.key==='Enter'||e.key===' ') closeModal(this.closest('.modal').id); 
+            });
+        });
+
+        // Listener para botão de logout (movido do HTML para cá)
+        const btnLogout = document.getElementById('btnLogout');
+        if (btnLogout) {
+            btnLogout.addEventListener('click', () => {
+                if (typeof deslogarUsuario === 'function') { // deslogarUsuario virá de auth.js
+                    deslogarUsuario();
+                } else {
+                    console.error('Função deslogarUsuario não definida. Verifique auth.js');
+                    // Fallback se auth.js não carregar ou a função não existir
+                    // localStorage.removeItem('usuarioLogado'); // Exemplo, depende da sua lógica de auth
+                    // window.location.href = 'index.html'; 
+                }
+            });
+        }
+    }
 });
 
 // --- FUNÇÕES DE IMPORTAÇÃO/EXPORTAÇÃO DE DADOS ---
-
+// Suas funções exportarDadosParaJson, importarDadosDeJson, limparDadosAplicacao existentes...
+// (O código que você forneceu parece bom)
 function exportarDadosParaJson() {
     if (!confirm("Deseja exportar todos os dados da aplicação para um arquivo JSON?")) {
         return;
     }
-
     calcularTodosSaldosDeMetas(); 
-    
     const nomeArquivo = `financiamento_dados_${new Date().toISOString().slice(0,10)}.json`;
     const dadosJson = JSON.stringify(dados, null, 2); 
     const blob = new Blob([dadosJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement('a');
     a.href = url;
     a.download = nomeArquivo;
@@ -1004,7 +1170,6 @@ function exportarDadosParaJson() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-
     mostrarAlerta('Dados exportados com sucesso! Verifique seus downloads.', 'success');
 }
 
@@ -1014,45 +1179,37 @@ function importarDadosDeJson() {
         mostrarAlerta('Por favor, selecione um arquivo JSON para importar.', 'warning');
         return;
     }
-
     const arquivo = inputArquivo.files[0];
     if (arquivo.type !== "application/json") {
         mostrarAlerta('Tipo de arquivo inválido. Por favor, selecione um arquivo .json.', 'warning');
         inputArquivo.value = ''; 
         return;
     }
-
-    if (!confirm("ATENÇÃO: Isso substituirá TODOS os dados atuais da aplicação. Deseja continuar? \n\nRecomenda-se ter um backup (exportação) dos dados atuais antes de prosseguir.")) {
+    if (!confirm("ATENÇÃO: Isso substituirá TODOS os dados atuais. Deseja continuar? \n\nRecomenda-se ter um backup (exportação) dos dados atuais.")) {
         inputArquivo.value = ''; 
         return;
     }
-
     const reader = new FileReader();
     reader.onload = function(event) {
         try {
             const dadosImportados = JSON.parse(event.target.result);
-
             if (typeof dadosImportados === 'object' && dadosImportados !== null &&
-                Array.isArray(dadosImportados.pagantes) &&
-                Array.isArray(dadosImportados.pagamentos) &&
-                Array.isArray(dadosImportados.metasDePagamento) &&
-                Array.isArray(dadosImportados.historicoINCC) && 
+                Array.isArray(dadosImportados.pagantes) && Array.isArray(dadosImportados.pagamentos) &&
+                Array.isArray(dadosImportados.metasDePagamento) && Array.isArray(dadosImportados.historicoINCC) && 
                 typeof dadosImportados.configuracoes === 'object' && dadosImportados.configuracoes !== null) {
                 
                 dados = dadosImportados; 
                 salvarDados();       
                 calcularTodosSaldosDeMetas(); 
                 atualizarInterfaceCompleta(); 
-                
-                showSection('dashboard'); 
-
+                showSection('dashboard', document.querySelector('.nav-btn[onclick*="dashboard"]')); 
                 mostrarAlerta('Dados importados com sucesso!', 'success');
             } else {
-                mostrarAlerta('Erro: O arquivo JSON não parece ter a estrutura de dados esperada para esta aplicação.', 'error');
+                mostrarAlerta('Erro: O arquivo JSON não parece ter a estrutura de dados esperada.', 'error');
             }
         } catch (e) {
             console.error("Erro ao parsear JSON importado:", e);
-            mostrarAlerta('Erro ao ler o arquivo JSON. Verifique se o arquivo está formatado corretamente.', 'error');
+            mostrarAlerta('Erro ao ler o arquivo JSON. Verifique se está formatado corretamente.', 'error');
         } finally {
             inputArquivo.value = ''; 
         }
@@ -1062,4 +1219,19 @@ function importarDadosDeJson() {
         inputArquivo.value = '';
     };
     reader.readAsText(arquivo);
+}
+
+function limparDadosAplicacao() {
+    if (confirm("Tem certeza de que deseja limpar TODOS os dados da aplicação? Esta ação não pode ser desfeita.")) {
+        localStorage.removeItem('financiamentoData');
+        dados = {
+            pagantes: [], pagamentos: [], metasDePagamento: [],
+            configuracoes: { valorImovel: 0, valorFinanciado: 0, inccBase: 100 },
+            historicoINCC: []
+        };
+        atualizarInterfaceCompleta();
+        mostrarAlerta('Todos os dados da aplicação foram limpos com sucesso!', 'success');
+    } else {
+        mostrarAlerta('Operação de limpeza de dados cancelada.', 'warning');
+    }
 }

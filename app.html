@@ -6,6 +6,62 @@
     <title>Controle de Financiamento - Sua Casa</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Seus estilos existentes em css/style.css */
+
+        /* Estilos para os seletores de filtro do dashboard */
+        .dashboard-filter {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 1px solid #e0e0e0;
+        }
+        .dashboard-filter h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            color: #333;
+            font-weight: 500;
+        }
+        .dashboard-filter .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        .dashboard-filter .form-group {
+            flex: 1;
+            min-width: 150px;
+        }
+        .dashboard-filter label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .dashboard-filter select, .dashboard-filter .btn {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 1em;
+            background-color: #fff;
+        }
+        .dashboard-filter .btn {
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+         .dashboard-filter .btn:hover {
+            background-color: #0056b3;
+        }
+        .dashboard-filter .form-group.action-button {
+            flex-grow: 0.5; 
+        }
+    </style>
 </head>
 <body>
     <div class="app-header">
@@ -23,19 +79,41 @@
         </header>
 
         <nav class="nav-buttons">
-            <button class="nav-btn" onclick="showSection('dashboard')"><i class="fas fa-chart-pie"></i> Resumo</button>
-            <button class="nav-btn" onclick="showSection('metas')"><i class="fas fa-bullseye"></i> Metas</button>
-            <button class="nav-btn" onclick="showSection('pagantes')"><i class="fas fa-users"></i> Pagantes</button>
-            <button class="nav-btn" onclick="showSection('pagamentos')"><i class="fas fa-money-bill-wave"></i> Pagamentos</button>
-            <button class="nav-btn" onclick="showSection('incc')"><i class="fas fa-calculator"></i> Reajuste INCC</button>
-            <button class="nav-btn" onclick="showSection('relatorios')"><i class="fas fa-chart-bar"></i> Relatórios</button>
-            <button class="nav-btn" onclick="showSection('dados')">
+            <button class="nav-btn active" onclick="showSection('dashboard', this)"><i class="fas fa-chart-pie"></i> Resumo</button>
+            <button class="nav-btn" onclick="showSection('metas', this)"><i class="fas fa-bullseye"></i> Metas</button>
+            <button class="nav-btn" onclick="showSection('pagantes', this)"><i class="fas fa-users"></i> Pagantes</button>
+            <button class="nav-btn" onclick="showSection('pagamentos', this)"><i class="fas fa-money-bill-wave"></i> Pagamentos</button>
+            <button class="nav-btn" onclick="showSection('incc', this)"><i class="fas fa-calculator"></i> Reajuste INCC</button>
+            <button class="nav-btn" onclick="showSection('relatorios', this)"><i class="fas fa-chart-bar"></i> Relatórios</button>
+            <button class="nav-btn" onclick="showSection('dados', this)">
                 <i class="fas fa-database"></i> Dados
             </button>
         </nav>
 
-        <section id="dashboard" class="section">
+        <section id="dashboard" class="section active">
             <h2>Resumo Geral</h2>
+
+            <div class="dashboard-filter">
+                <h3><i class="fas fa-filter"></i> Filtrar Resumo por Período:</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="selectMesDashboardFiltro">Mês:</label>
+                        <select id="selectMesDashboardFiltro">
+                            {/* Opções de Mês serão populadas via JS */}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="selectAnoDashboardFiltro">Ano:</label>
+                        <select id="selectAnoDashboardFiltro">
+                            {/* Opções de Ano serão populadas via JS */}
+                        </select>
+                    </div>
+                     <div class="form-group action-button">
+                        <button class="btn" id="btnAplicarFiltroDashboard"><i class="fas fa-search"></i> Aplicar</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="dashboard-cards">
                 <div class="card green"><h3><i class="fas fa-check-circle"></i> Total Pago Efetivamente</h3><div class="value" id="totalPago">R$ 0,00</div><p>Soma de todas as contribuições pagas</p></div>
                 <div class="card orange"><h3><i class="fas fa-clock"></i> Total Pendente (Lançamentos)</h3><div class="value" id="totalPendente">R$ 0,00</div><p>Soma dos lançamentos com status pendente/parcial</p></div>
@@ -46,10 +124,10 @@
             <p style="text-align: center; margin-top: 10px;"><strong>Progresso Geral dos Lançamentos: <span id="progressText">0%</span> concluído</strong></p>
             <div id="proximosVencimentos" class="pagamentos-list" style="margin-top:30px;"><h3>Próximos Vencimentos</h3></div>
         </section>
+        
         <section id="metas" class="section"><h2><i class="fas fa-bullseye"></i> Gerenciar Metas de Pagamento</h2><p style="text-align: center; margin-bottom: 25px; color: #666;">Cadastre os grandes objetivos financeiros (ex: Entrada, ITBI) para acompanhar o progresso.</p><button class="btn" onclick="openModalMeta()"><i class="fas fa-plus"></i> Adicionar Nova Meta</button><div id="metasList" class="pagamentos-list" style="margin-top: 20px;"></div></section>
         <section id="pagantes" class="section"><h2>Gerenciar Pagantes</h2><button class="btn" onclick="openModal('modalPagante')"><i class="fas fa-plus"></i> Adicionar Pagante</button><div id="pagantesList" class="pagantes-list"></div></section>
         <section id="pagamentos" class="section"><h2>Controle de Pagamentos</h2><button class="btn" onclick="abrirModalEdicaoPagamento(null)"><i class="fas fa-plus"></i> Adicionar Pagamento</button><div id="pagamentosList" class="pagamentos-list"></div></section>
-        
         <section id="incc" class="section">
             <h2>Analisador de Reajuste INCC na Parcela</h2>
             <p style="text-align: center; margin-bottom: 25px; color: #666;">
@@ -82,10 +160,8 @@
                 <h3>Histórico de Análises de Reajuste</h3>
             </div>
         </section>
-
         <section id="dados" class="section">
             <h2><i class="fas fa-database"></i> Gerenciar Dados da Aplicação</h2>
-            
             <div class="card" style="background: white; color: #333; text-align: left; margin-bottom: 30px;">
                 <h3 style="color: #667eea; margin-bottom: 15px;"><i class="fas fa-file-export"></i> Exportar Dados</h3>
                 <p style="margin-bottom: 15px;">
@@ -96,7 +172,6 @@
                     <i class="fas fa-download"></i> Exportar Dados para JSON
                 </button>
             </div>
-
             <div class="card" style="background: white; color: #333; text-align: left;">
                 <h3 style="color: #667eea; margin-bottom: 15px;"><i class="fas fa-file-import"></i> Importar Dados</h3>
                 <p style="margin-bottom: 10px;">
@@ -114,32 +189,19 @@
                 </button>
             </div>
         </section>
-
         <section id="relatorios" class="section"><h2>Relatórios</h2><div class="grid-2"><button class="btn" onclick="gerarRelatorioGeral()"><i class="fas fa-file-alt"></i> Relatório Geral</button><button class="btn" onclick="gerarRelatorioPagantes()"><i class="fas fa-users"></i> Por Pagante</button></div><div id="relatorioContent" style="margin-top: 30px;"></div></section>
     </div>
 
     <div id="modalPagante" class="modal"><div class="modal-content"><span class="close" onclick="closeModal('modalPagante')" role="button" tabindex="0" aria-label="Fechar">&times;</span><h3 id="modalPaganteTitle">Adicionar Pagante</h3><form id="formPagante" onsubmit="salvarPagante(event)"><input type="hidden" id="idPaganteEditando" value=""><div class="form-group"><label for="nomePagante">Nome Completo:</label><input type="text" id="nomePagante" required></div><div class="form-group"><label for="apelidoPagante" class="tooltip" data-tooltip="Como você quer chamá-lo no sistema">Apelido:</label><input type="text" id="apelidoPagante"></div><button type="submit" class="btn btn-success" id="btnSalvarPagante"><i class="fas fa-save"></i> Salvar</button><button type="button" class="btn" onclick="closeModal('modalPagante')">Cancelar</button></form></div></div>
     <div id="modalPagamento" class="modal"><div class="modal-content"><span class="close" onclick="closeModal('modalPagamento')" role="button" tabindex="0" aria-label="Fechar">&times;</span><h3 id="modalPagamentoTitle">Adicionar Pagamento</h3><form id="formPagamento" onsubmit="salvarPagamento(event)"><input type="hidden" id="idPagamentoEditando" value=""><div class="form-group"><label for="tipoPagamento">Tipo de Pagamento:</label><select id="tipoPagamento" required onchange="updateTipoPagamento()"><option value="">Selecione...</option><option value="sinal">Sinal de Entrada</option><option value="entrada">Parcela de Entrada</option><option value="incc">Reajuste INCC</option><option value="juros">Juros de Obras</option><option value="registro">Taxa de Registro</option><option value="itbi">ITBI</option><option value="outros">Outros Custos</option></select></div><div class="form-group"><label for="descricaoPagamento">Descrição:</label><input type="text" id="descricaoPagamento" required></div><div class="grid-2"><div class="form-group"><label for="valorPagamento">Valor Total:</label><input type="number" id="valorPagamento" step="0.01" required min="0.01" oninput="gerenciarCamposContribuicao(); updateFormattedInputDisplay('valorPagamento', 'formattedValorPagamentoDisplay');"><span id="formattedValorPagamentoDisplay" class="formatted-input-display"></span></div><div class="form-group"><label for="dataPagamento">Data de Vencimento:</label><input type="date" id="dataPagamento" required></div></div><div class="form-group"><label for="vincularMetaPagamento">Vincular a uma Meta? (Opcional)</label><select id="vincularMetaPagamento"><option value="">Nenhuma meta específica</option></select></div><div class="form-group" id="blocoContribuicoesPagantes" style="display:none; margin-top: 20px; padding-top:15px; border-top: 1px solid #eee;"><h5>Distribuição entre Pagantes:</h5><div id="camposContribuicaoPagantes" style="margin-bottom:10px;"></div><div id="distribuicaoPagantesFeedback" style="font-weight: normal;"><p>Valor Total do Pagamento: R$ <strong id="valorTotalPagamentoDisplay">0.00</strong></p><p>Soma das Contribuições: R$ <strong id="somaContribuicoesDisplay">0.00</strong></p><p>Diferença: R$ <strong id="diferencaContribuicoesDisplay" style="color: red;">0.00</strong></p></div></div><button type="submit" class="btn btn-success" id="btnSubmitPagamento"><i class="fas fa-save"></i> Salvar</button><button type="button" class="btn" onclick="closeModal('modalPagamento')">Cancelar</button></form></div></div>
     <div id="modalMeta" class="modal"><div class="modal-content"><span class="close" onclick="closeModal('modalMeta')" role="button" tabindex="0" aria-label="Fechar">&times;</span><h3 id="modalMetaTitle">Adicionar Nova Meta de Pagamento</h3><form id="formMeta" onsubmit="salvarMeta(event)"><input type="hidden" id="idMeta" value=""><div class="form-group"><label for="nomeMeta">Nome da Meta:</label><input type="text" id="nomeMeta" required></div><div class="form-group"><label for="valorTotalMeta">Valor Total da Meta (R$):</label><input type="number" id="valorTotalMeta" step="0.01" min="0.01" required oninput="updateFormattedInputDisplay('valorTotalMeta', 'formattedValorTotalMetaDisplay')"><span id="formattedValorTotalMetaDisplay" class="formatted-input-display"></span></div><div class="form-group"><input type="checkbox" id="metaPrincipalDashboard" onchange="handleMetaPrincipalCheckbox(this)"><label for="metaPrincipalDashboard" style="display: inline; font-weight: normal;">Marcar como meta principal no Dashboard?</label></div><button type="submit" class="btn btn-success" id="btnSalvarMeta"><i class="fas fa-save"></i> Salvar Meta</button><button type="button" class="btn" onclick="closeModal('modalMeta')">Cancelar</button></form></div></div>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script> <script src="js/firebase-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="js/firebase-config.js"></script>
-    <script src="js/auth.js"></script> <script src="js/app.js"></script>
+    <script src="js/auth.js"></script> 
+    <script src="js/app.js"></script> {/* SEU ARQUIVO APP.JS MODIFICADO */}
 
-    <script>
-        // Listener para o botão de logout
-        const btnLogout = document.getElementById('btnLogout');
-        if (btnLogout) {
-            btnLogout.addEventListener('click', () => {
-                // A função deslogarUsuario virá do seu arquivo auth.js
-                if (typeof deslogarUsuario === 'function') {
-                    deslogarUsuario();
-                } else {
-                    console.error('Função deslogarUsuario não definida. Verifique auth.js');
-                }
-            });
-        }
-    </script>
 </body>
 </html>
